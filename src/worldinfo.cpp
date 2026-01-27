@@ -1,132 +1,120 @@
-/**
- * @Copyright 2015 seancode
- *
- * Handles static world information (tile styling and names, etc)
- */
+/** @copyright 2025 Sean Kasun */
 
-#include <QFile>
-#include <QJsonDocument>
-#include <QDebug>
-#include "./worldinfo.h"
-#include "./world.h"
+#include "worldinfo.h"
+#include "assets.h"
+#include "tiles.h"
 
-WorldInfo::WorldInfo(QObject *parent) : QObject(parent) {
-}
+#include <SDL3/SDL.h>
+#include <memory>
+#include <cassert>
 
-static quint32 readColor(QString const &s) {
-  quint32 color = 0;
-  for (auto ch : s) {
+static uint32_t readColor(const std::string &s) {
+  uint32_t color = 0;
+  for (auto c : s) {
     color <<= 4;
-    char c = ch.unicode();
-    if (c >= '0' && c <= '9')
+    if (c >= '0' && c <= '9') {
       color |= c - '0';
-    else if (c >= 'a' && c <= 'f')
+    } else if (c >= 'a' && c <= 'f') {
       color |= c - 'a' + 10;
-    else if (c >= 'A' && c <= 'F')
+    } else if (c >= 'A' && c <= 'F') {
       color |= c - 'A' + 10;
+    }
   }
   return color;
 }
 
-void WorldInfo::init() {
-  // must load items first
-  const auto jitems = load(":/res/items.json");
-  for (auto const &item : jitems) {
-    QJsonObject const &obj = item.toObject();
-    quint16 id = obj["id"].toInt();
-    items[id] = obj["name"].toString();
-  }
-  const auto jtiles = load(":/res/tiles.json");
-  for (const auto &i : jtiles) {
-    QJsonObject const &obj = i.toObject();
-    quint16 id = obj["id"].toInt();
-    tiles[id] = QSharedPointer<TileInfo>(new TileInfo(items, obj));
-  }
-  const auto jwalls = load(":/res/walls.json");
-  for (auto const &item : jwalls) {
-    QJsonObject const &obj = item.toObject();
-    quint16 id = obj["id"].toInt();
-    walls[id] = QSharedPointer<WallInfo>(new WallInfo(items, id, obj));
-  }
-  const auto jprefixes = load(":/res/prefixes.json");
-  for (auto const &item : jprefixes) {
-    QJsonObject const &obj = item.toObject();
-    quint16 id = obj["id"].toInt();
-    prefixes[id] = obj["name"].toString();
-  }
-  const auto jnpcs = load(":/res/npcs.json");
-  for (auto const &item : jnpcs) {
-    QJsonObject const &obj = item.toObject();
-    quint16 id = obj["id"].toInt();
-    npcsById[id] = QSharedPointer<NPC>(new NPC(obj));
-    if (obj.contains("banner"))
-      npcsByBanner[obj["banner"].toInt()] = QSharedPointer<NPC>(new NPC(obj));
-    else if (!npcsByName.contains(obj["name"].toString()))
-      npcsByName[obj["name"].toString()] = QSharedPointer<NPC>(new NPC(obj));
-  }
-  const auto jglobals = load(":/res/globals.json");
-  for (auto const &item : jglobals) {
-    QJsonObject const &obj = item.toObject();
-    QString kind = obj["id"].toString();
-    quint32 color = readColor(obj["color"].toString());
-    if (kind == "sky")
-      sky = color;
-    else if (kind == "earth")
-      earth = color;
-    else if (kind == "rock")
-      rock = color;
-    else if (kind == "hell")
-      hell = color;
-    else if (kind == "water")
-      water = color;
-    else if (kind == "lava")
-      lava = color;
-    else if (kind == "honey")
-      honey = color;
-    else if (kind == "shimmer")
-      shimmer = color;
+WorldInfo::WorldInfo() {
+  try {
+    // load items first so later files can reference them
+    const auto jitems = JSON::parse(items_json);
+    for (int i = 0; i < jitems->length(); i++) {
+      const auto &item = jitems->at(i);
+      items[item->at("id")->asInt()] = item->at("name")->asString();
+    }
+    const auto jtiles = JSON::parse(tiles_json);
+    for (int i = 0; i < jtiles->length(); i++) {
+      const auto &tile = jtiles->at(i);
+      tiles[tile->at("id")->asInt()] = std::make_shared<TileInfo>(tile, items);
+    }
+    const auto jwalls = JSON::parse(walls_json);
+    for (int i = 0; i < jwalls->length(); i++) {
+      const auto &wall = jwalls->at(i);
+      walls[wall->at("id")->asInt()] = std::make_shared<WallInfo>(wall, items);
+    }
+    const auto jprefixes = JSON::parse(prefixes_json);
+    for (int i = 0; i < jprefixes->length(); i++) {
+      const auto &prefix = jprefixes->at(i);
+      prefixes[prefix->at("id")->asInt()] = prefix->at("name")->asString();
+    }
+    const auto jnpcs = JSON::parse(npcs_json);
+    for (int i = 0; i < jnpcs->length(); i++) {
+      const auto &jnpc = jnpcs->at(i);
+      const auto npc = std::make_shared<NPC>(jnpc);
+      npcsById[jnpc->at("id")->asInt()] = npc;
+      if (jnpc->has("banner")) {
+        npcsByBanner[jnpc->at("banner")->asInt()] = npc;
+      } else if (npcsByName.find(jnpc->at("name")->asString()) == npcsByName.end()) {
+        npcsByName[jnpc->at("name")->asString()] = npc;
+      } 
+    }
+    const auto jglobals = JSON::parse(globals_json);
+    for (int i = 0; i < jglobals->length(); i++) {
+      const auto &global = jglobals->at(i);
+      const auto &kind = global->at("id")->asString();
+      const auto color = readColor(global->at("color")->asString());
+      if (kind == "sky") {
+        sky = color;
+      } else if (kind == "earth") {
+        earth = color;
+      } else if (kind == "rock") {
+        rock = color;
+      } else if (kind == "hell") {
+        hell = color;
+      } else if (kind == "water") {
+        water = color;
+      } else if (kind == "lava") {
+        lava = color;
+      } else if (kind == "honey") {
+        honey = color;
+      } else if (kind == "shimmer") {
+        shimmer = color;
+      }
+    }
+  } catch (JSONParseException e) {
+    SDL_Log("Failed: %s", e.reason.c_str());
+    exit(-1);
   }
 }
 
-QJsonArray WorldInfo::load(const QString &filename) {
-  QFile file(filename);
-  if (!file.open(QIODevice::ReadOnly))
-    throw InitException(tr("%1 is missing!").arg(filename));
-  QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-  file.close();
-
-  if (doc.isNull())
-    throw InitException(tr("%1 is corrupt").arg(filename));
-
-  if (!doc.isArray())
-    throw InitException(tr("%1 isn't an array").arg(filename));
-
-  return doc.array();
+std::shared_ptr<TileInfo> WorldInfo::operator[](Tile const &tile) const {
+  auto v = tile.v;
+  if (tile.type == TileStatues) {
+    v %= 162;
+  }
+  return find(tiles.at(tile.type), tile.u, v);
 }
 
-QSharedPointer<TileInfo> WorldInfo::operator[](Tile const *tile) const {
-  return find(tiles[tile->type], tile->u, tile->v);
+std::shared_ptr<TileInfo> WorldInfo::operator[](int16_t type) const {
+  return tiles.at(type);
 }
-QSharedPointer<TileInfo> WorldInfo::operator[](int type) const {
-  return tiles[type];
-}
-QSharedPointer<TileInfo> WorldInfo::find(QSharedPointer<TileInfo> tile,
-                                         quint16 u, quint16 v) const {
-  for (auto const &var : tile->variants) {
+
+std::shared_ptr<TileInfo> WorldInfo::find(std::shared_ptr<TileInfo> tile, int16_t u, int16_t v) const {
+  for (const auto &var : tile->variants) {
     // must match all restrictions
     if ((var->u < 0 || var->u == u) &&
-        (var->v < 0 || var->v == v) &&
-        (var->minu < 0 || var->minu <= u) &&
-        (var->minv < 0 || var->minv <= v) &&
-        (var->maxu < 0 || var->maxu > u) &&
-        (var->maxv < 0 || var->maxv > v))
-      return find(var, u, v);  // check for more subvariants
+      (var->v < 0 || var->v == v) &&
+      (var->minu < 0 || var->minu <= u) &&
+      (var->minv < 0 || var->minv <= v) &&
+      (var->maxu < 0 || var->maxu > u) &&
+      (var->maxv < 0 || var->maxv > v)) {
+      return find(var, u, v);  // recursive
+    }
   }
-  return tile;  // no further subvariants found
+  return tile;  // no variants found
 }
 
-static TileInfo::MergeBlend parseMB(const QString &tag, bool blend, int *offset) {
-  QString group = "";
+static TileInfo::MergeBlend parseMB(const std::string &tag, bool blend, int *offset) {
+  std::string group = "";
   TileInfo::MergeBlend mb;
   mb.hasTile = false;
   mb.direction = 0;
@@ -136,9 +124,10 @@ static TileInfo::MergeBlend parseMB(const QString &tag, bool blend, int *offset)
   mb.recursive = false;
   int i = *offset;
   while (i < tag.length()) {
-    char c = tag.at(i++).unicode();
-    if (c == ',')
+    char c = tag[i++];
+    if (c == ',') {
       break;
+    }
     if (c == '*') {
       mb.recursive = true;
     } else if (c == 'v') {
@@ -154,87 +143,98 @@ static TileInfo::MergeBlend parseMB(const QString &tag, bool blend, int *offset)
     } else if (c >= 'a' && c <= 'z') {
       group += c;
     } else {
-      throw WorldInfo::InitException(QString("Unknown type: %1").arg(c));
+      assert(false && "Unknown type");
     }
   }
 
-  if (mb.direction == 0) mb.direction = 0xff;
+  if (mb.direction == 0) {
+    mb.direction = 0xff;
+  }
   if (!mb.hasTile) {
-    if (group == "solid") mb.mask |= 1;
-    else if (group == "dirt") mb.mask |= 4;
-    else if (group == "brick") mb.mask |= 128;
-    else if (group == "moss") mb.mask |= 256;
-    else
-      throw WorldInfo::InitException(QString("Unknown group: %1").arg(group));
+    if (group == "solid") {
+      mb.mask |= 1;
+    } else if (group == "dirt") {
+      mb.mask |= 4;
+    } else if (group == "brick") {
+      mb.mask |= 128;
+    } else if (group == "moss") {
+      mb.mask |= 256;
+    } else {
+      assert(false && "Unknown group");
+    }
   }
   *offset = i;
   return mb;
 }
 
-TileInfo::TileInfo(const QHash<quint16, QString> &items,
-                   const QJsonObject &json) {
-  if (json.contains("ref")) {
-    name = items[json["ref"].toInt(0)];
+TileInfo::TileInfo(std::shared_ptr<JSONData> json, const std::unordered_map<uint16_t, std::string> &items) {
+  static int cnt = 0;
+  if (json->has("ref")) {
+    if (const auto child = items.find(json->at("ref")->asInt()); child != items.end()) {
+      name = child->second;
+    }
   } else {
-    name = json["name"].toString();
+    name = json->at("name")->asString();
   }
-  color = json.contains("color") ? readColor(json["color"].toString()) : 0;
-  lightR = json.contains("r") ? json["r"].toDouble(0.0) : 0.0;
-  lightG = json.contains("g") ? json["g"].toDouble(0.0) : 0.0;
-  lightB = json.contains("b") ? json["b"].toDouble(0.0) : 0.0;
-  mask = json["flags"].toInt(0);
+  color = json->has("color") ? readColor(json->at("color")->asString()) : 0;
+  lightR = json->has("r") ? json->at("r")->asNumber() : 0.0;
+  lightG = json->has("g") ? json->at("g")->asNumber() : 0.0;
+  lightB = json->has("b") ? json->at("b")->asNumber() : 0.0;
+  mask = json->at("flags")->asInt();
   solid = mask & 1;
   transparent = mask & 2;
   dirt = mask & 4;
   stone = mask & 8;
-  grass = mask & 16;
-  pile = mask & 32;
-  flip = mask & 64;
-  brick = mask & 128;
-  // moss = mask & 256;
-  merge = mask & 512;
-  large = mask & 1024;
-  isHilighting = false;
-  u = v = minu = maxu = minv = maxv = 0;
+  grass = mask & 0x10;
+  pile = mask & 0x20;
+  flip = mask & 0x40;
+  brick = mask & 0x80;
+  //moss = mask & 0x100;
+  merge = mask & 0x200;
+  large = mask & 0x400;
+  u = v = minu = minv = maxu = maxv = 0;
 
-  QString b = json["blend"].toString();
+  auto b = json->at("blend")->asString();
   int offset = 0;
-  while (offset < b.length())
-    blends.append(parseMB(b, true, &offset));
+  while (offset < b.length()) {
+    blends.push_back(parseMB(b, true, &offset));
+  }
 
-  QString m = json["merge"].toString();
+  auto m = json->at("merge")->asString();
   offset = 0;
-  while (offset < m.length())
-    blends.append(parseMB(m, false, &offset));
+  while (offset < m.length()) {
+    blends.push_back(parseMB(m, false, &offset));
+  }
 
-  width = json["w"].toInt(18);
-  height = json["h"].toInt(18);
-  skipy = json["skipy"].toInt(0);
-  toppad = json["toppad"].toInt(0);
-  if (json.contains("var")) {
-    const auto &vars = json["var"].toArray();
-    for (auto const &item : vars) {
-      QJsonObject const &obj = item.toObject();
-      variants.append(QSharedPointer<TileInfo>(new TileInfo(items, obj,
-                                                            *this)));
+  width = json->at("w")->asInt(18);
+  height = json->at("h")->asInt(18);
+  skipy = json->at("skipy")->asInt();
+  toppad = json->at("toppad")->asInt();
+  if (json->has("var")) {
+    const auto &vars = json->at("var");
+    for (int i = 0; i < vars->length(); i++) {
+      variants.push_back(std::make_shared<TileInfo>(vars->at(i), items, *this));
     }
   }
 }
-TileInfo::TileInfo(const QHash<quint16, QString> &items,
-                   const QJsonObject &json, const TileInfo &parent) {
-  if (json.contains("ref")) {
-    name = items[json["ref"].toInt(0)];
+
+TileInfo::TileInfo(std::shared_ptr<JSONData> json, const std::unordered_map<uint16_t, std::string> &items, const TileInfo &parent) {
+  if (json->has("ref")) {
+    if (const auto child = items.find(json->at("ref")->asInt()); child != items.end()) {
+      name = child->second;
+    }
   } else {
-    name = json["name"].toString(parent.name);
+    name = json->at("name")->asString();
   }
-  color = json.contains("color") ? readColor(json["color"].toString())
-      : parent.color;
-  lightR = json["r"].toDouble(parent.lightR);
-  lightG = json["g"].toDouble(parent.lightG);
-  lightB = json["b"].toDouble(parent.lightB);
+  if (name.empty()) {
+    name = parent.name;
+  }
+  color = json->has("color") ? readColor(json->at("color")->asString()) : parent.color;
+  lightR = json->at("r")->asNumber(parent.lightR);
+  lightG = json->at("g")->asNumber(parent.lightG);
+  lightB = json->at("b")->asNumber(parent.lightB);
 
   mask = parent.mask;
-  isHilighting = false;
 
   solid = parent.solid;
   transparent = parent.transparent;
@@ -250,36 +250,37 @@ TileInfo::TileInfo(const QHash<quint16, QString> &items,
   width = parent.width;
   height = parent.height;
   skipy = parent.skipy;
-  toppad = json["toppad"].toInt(parent.toppad);
-  u = json["x"].toInt(-1) * width;
-  v = json["y"].toInt(-1) * (height + skipy);
-  minu = json["minx"].toInt(-1) * width;
-  maxu = json["maxx"].toInt(-1) * width;
-  minv = json["miny"].toInt(-1) * (height + skipy);
-  maxv = json["maxy"].toInt(-1) * (height + skipy);
-  if (json.contains("var")) {
-    QJsonArray const &arr = json["var"].toArray();
-    for (auto const &item : arr) {
-      QJsonObject const &obj = item.toObject();
-      variants.append(QSharedPointer<TileInfo>(new TileInfo(items, obj,
-                                                            *this)));
+  toppad = json->at("toppad")->asInt(parent.toppad);
+  u = json->at("x")->asInt(-1) * width;
+  v = json->at("y")->asInt(-1) * (height + skipy);
+  minu = json->at("minx")->asInt(-1) * width;
+  maxu = json->at("maxx")->asInt(-1) * width;
+  minv = json->at("miny")->asInt(-1) * (height + skipy);
+  maxv = json->at("maxy")->asInt(-1) * (height + skipy);
+
+  if (json->has("var")) {
+    const auto &vars = json->at("var");
+    for (int i = 0; i < vars->length(); i++) {
+      variants.push_back(std::make_shared<TileInfo>(vars->at(i), items, *this));
     }
   }
 }
 
-WorldInfo::WallInfo::WallInfo(const QHash<quint16, QString> &items, quint16 id,
-                              const QJsonObject &json) {
-  if (json.contains("ref")) {
-    name = items[json["ref"].toInt(0)];
+WallInfo::WallInfo(std::shared_ptr<JSONData> json, const std::unordered_map<uint16_t, std::string> &items) {
+  if (json->has("ref")) {
+    if (const auto child = items.find(json->at("ref")->asInt()); child != items.end()) {
+      name = child->second;
+    }
   } else {
-    name = json["name"].toString();
+    name = json->at("name")->asString();
   }
-  color = json.contains("color") ? readColor(json["color"].toString()) : 0;
-  blend = json["blend"].toInt(id);
+  color = json->has("color") ? readColor(json->at("color")->asString()) : 0;
+  // blend with itself if it doesn't have a blend set
+  blend = json->at("blend")->asInt(json->at("id")->asInt());
 }
 
-WorldInfo::NPC::NPC(QJsonObject const &json) {
-  title = json["name"].toString();
-  head = json["head"].toInt();
-  id = json["id"].toInt();
+NPC::NPC(std::shared_ptr<JSONData> json) {
+  title = json->at("name")->asString();
+  head = json->at("head")->asInt();
+  id = json->at("id")->asInt();
 }

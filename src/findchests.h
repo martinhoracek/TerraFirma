@@ -1,37 +1,29 @@
-/** @Copyright 2015 seancode */
+/** @copyright 2025 Sean Kasun */
 
 #pragma once
 
-#include <QDialog>
-#include <QStandardItemModel>
-#include <QSortFilterProxyModel>
-#include "./world.h"
-#include "./l10n.h"
+#include "world.h"
+#include "l10n.h"
 
-namespace Ui {
-class FindChests;
-}
+#include <vector>
+#include <glm/ext/vector_float2.hpp>
 
-class FindChests : public QDialog {
-  Q_OBJECT
+class FindChests {
+  public:
+    FindChests(const World &world, const L10n &l10n);
+    glm::vec2 pickChest();
 
- public:
-  explicit FindChests(const QList<World::Chest> &chests, L10n *l10n,
-                      QWidget *parent = nullptr);
-  ~FindChests();
-
- public slots:
-  void chestSelected(const QModelIndex& current, const QModelIndex& previous);
-  void searchTextChanged(const QString &newText);
-
- signals:
-  void jump(QPointF);
-
- private:
-  class ItemsFilterProxyModel;
-
- private:
-  Ui::FindChests *ui;
-  ItemsFilterProxyModel *filter;
-  QStandardItemModel model;
+  private:
+    struct Chest {
+      std::string name;
+      glm::vec2 location;
+    };
+    struct Item {
+      std::string name;
+      std::vector<Chest> chests;
+      std::set<std::pair<float, float>> seen;
+    };
+    std::string search;
+    std::vector<Item> items;
+    glm::vec2 selected;
 };

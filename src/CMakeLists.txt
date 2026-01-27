@@ -1,70 +1,58 @@
-add_executable(terrafirma
-  aes128.cpp
-  beastiarydialog.ui
-  beastiarydialog.cpp
-  chestview.ui
-  chestview.cpp
-  findchests.ui
-  findchests.cpp
-  glmap.cpp
-  gltextures.cpp
-  handle.cpp
-  hilitedialog.ui
-  hilitedialog.cpp
-  infodialog.ui
-  infodialog.cpp
-  killdialog.ui
-  killdialog.cpp
-  l10n.cpp
-  lzx.c
+add_executable(${PROJECT_NAME})
+
+add_executable(embed embed.cpp)
+file(GLOB shaderbins shaders/compiled/*)
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/shaders.cpp ${CMAKE_CURRENT_SOURCE_DIR}/shaders.h
+  COMMAND embed shaders/compiled shaders.cpp shaders.h
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS ${shaderbins}
+)
+
+file(GLOB assetjsons "${PROJECT_SOURCE_DIR}/assets/jsons/*")
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/assets.cpp ${CMAKE_CURRENT_SOURCE_DIR}/assets.h
+  COMMAND embed "${PROJECT_SOURCE_DIR}/assets/jsons" assets.cpp assets.h str
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS ${assetjsons}
+)
+
+file(GLOB ttfbins "${PROJECT_SOURCE_DIR}/assets/ttfs/*")
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/ttfs.cpp ${CMAKE_CURRENT_SOURCE_DIR}/ttfs.h
+  COMMAND embed "${PROJECT_SOURCE_DIR}/assets/ttfs" ttfs.cpp ttfs.h
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS ${ttfbins}
+)
+
+target_sources(${PROJECT_NAME} PRIVATE
   main.cpp
-  mainwindow.ui
-  mainwindow.cpp
-  render.cpp
-  settingsdialog.ui
-  settingsdialog.cpp
-  signview.ui
-  signview.cpp
-  steamconfig.cpp
-  uvrules.cpp
-  world.cpp
-  worldheader.cpp
-  worldinfo.cpp
-  ${app_icon}
+  bestiary.cpp bestiary.h
+  filedialogfont.cpp filedialogfont.h
+  findchests.cpp findchests.h
+  gui.cpp gui.h
+  handle.cpp handle.h
+  hilitewin.cpp hilitewin.h
+  infowin.cpp infowin.h
+  json.cpp json.h
+  l10n.cpp l10n.h
+  killwin.cpp killwin.h
+  map.cpp map.h
+  pipelines.cpp pipelines.h
+  renderer.cpp renderer.h
+  settings.cpp settings.h
+  steamconfig.cpp steamconfig.h
+  terrafirma.cpp terrafirma.h
+  textures.cpp textures.h
+  tiles.cpp tiles.h
+  uvrules.cpp uvrules.h
+  world.cpp world.h
+  worldheader.cpp worldheader.h
+  worldinfo.cpp worldinfo.h
+  assets.cpp assets.h
+  ttfs.cpp ttfs.h
+  shaders.cpp shaders.h
+  lzx.c lzx.h
 )
 
-qt_add_resources(terrafirma "data"
-  PREFIX "/res"
-  BASE "../res"
-  FILES
-  ../res/terrafirma.png
-  ../res/tiles.json
-  ../res/walls.json
-  ../res/items.json
-  ../res/prefixes.json
-  ../res/npcs.json
-  ../res/globals.json
-  ../res/header.json
-  ../res/shaders/flat_fs.glsl
-  ../res/shaders/flat_vs.glsl
-  ../res/shaders/fog_fs.glsl
-  ../res/shaders/fog_vs.glsl
-  ../res/shaders/tiles_fs.glsl
-  ../res/shaders/tiles_vs.glsl
-  ../res/shaders/water_fs.glsl
-  ../res/shaders/water_vs.glsl
-)
-
-set_source_files_properties(${app_icon} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
-
-target_include_directories(terrafirma PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(terrafirma PRIVATE Qt6::Widgets Qt6::OpenGL Qt6::OpenGLWidgets)
-if(WIN32)
-    target_link_libraries(terrafirma PRIVATE zlib)
-else()
-    target_link_libraries(terrafirma PRIVATE ZLIB::ZLIB)
-endif()
-set_target_properties(terrafirma PROPERTIES
-  WIN32_EXECUTABLE ON
-  MACOSX_BUNDLE ON
-)
+target_link_libraries(${PROJECT_NAME} PRIVATE vendor)

@@ -1,98 +1,134 @@
-/**
- * @Copyright 2015 seancode
- *
- * Handles parsing of the steam config files
- */
+/** @copyright 2025 Sean Kasun */
 
-#include "./steamconfig.h"
-#include <QSettings>
-#include <QTextStream>
-#include <QRegularExpression>
-#include <QRegularExpressionMatch>
-#include <QRegularExpressionMatchIterator>
-#include <QStandardPaths>
-#include <QDir>
+#include "steamconfig.h"
+#include <cctype>
+#include <fstream>
+#include <filesystem>
+#include <unistd.h>
+#include <pwd.h>
+#include <cctype>
+#include <algorithm>
+
+static const char *libFolders[] = {
+  "~/.local/share/Steam",   // linux
+  "~/Library/Application Support/Steam",  // mac
+  "C:/Program Files (x86)/Steam",  // windows
+  nullptr,
+};
 
 SteamConfig::SteamConfig() {
-  root = nullptr;
-  QSettings settings("HKEY_CURRENT_USER\\Software\\Valve\\Steam",
-                     QSettings::NativeFormat);
-  QString path = settings.value("SteamPath").toString();
-  if (path.isEmpty()) {
-    path =  QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation)
-        .constFirst();
-    path += QDir::toNativeSeparators("/Steam");
-  }
-  steamBase = path;
-  path += QDir::toNativeSeparators("/config/config.vdf");
-  QFile file(path);
-  if (file.exists())
-    parse(path);
-}
-
-QString SteamConfig::operator[](const QString &path) const {
-  if (root == nullptr)
-    return QString();
-  return root->find(path);
-}
-
-QString SteamConfig::getBase() const {
-  return steamBase;
-}
-
-void SteamConfig::parse(const QString &filename) {
-  QFile file(filename);
-
-  if (file.open(QIODevice::ReadOnly)) {
-    QList<QString> strings;
-    QTextStream in(&file);
-    while (!in.atEnd())
-      strings.append(in.readLine());
-    file.close();
-    root = new Element(&strings);
-  }
-}
-
-SteamConfig::Element::Element() = default;
-
-SteamConfig::Element::Element(QList<QString> *lines) {
-  QString line;
-  static QRegularExpression re("\"([^\"]*)\"");
-  QRegularExpressionMatchIterator i;
-  while (lines->length() > 0) {
-    line = lines->front();
-    lines->pop_front();
-    i = re.globalMatch(line);
-    if (i.hasNext())
-      break;
-  }
-  if (!lines->length())  // corrupt
-    return;
-  QRegularExpressionMatch match = i.next();
-  name = match.captured(1).toLower();
-  if (i.hasNext()) {  // value is a string
-    match = i.next();
-    value = match.captured(1);
-    value.replace("\\\\", "\\");
-  }
-  line = lines->front();
-  if (line.contains("{")) {
-    lines->pop_front();
-    while (!lines->isEmpty()) {
-      line = lines->front();
-      if (line.contains("}")) {  // empty
-        lines->pop_front();
-        return;
+  std::string home = getpwuid(getuid())->pw_dir;
+  for (int i = 0; libFolders[i]; i++) {
+    auto base = expand(libFolders[i]);
+    auto vdf = parsevdf(base / "config" / "libraryfolders.vdf");
+    if (vdf != nullptr) {
+      steamBase = base;
+      for (const auto &lib : vdf->children) {
+        // check if terraria is installed in this library
+        if (!lib.second.find("apps/105600").empty()) {
+          std::filesystem::path appbase = lib.second.find("path");
+          auto acf = parsevdf(appbase / "steamapps" / "appmanifest_105600.acf");
+          if (acf != nullptr) {
+            terrariaBase = appbase / "steamapps" / "common" / acf->find("installdir");
+          }
+        }
       }
-      Element e(lines);
-      children[e.name] = e;
     }
   }
 }
 
-QString SteamConfig::Element::find(const QString &path) {
-  int ofs = path.indexOf("/");
-  if (ofs == -1)
-    return children[path].value;
-  return children[path.left(ofs)].find(path.mid(ofs + 1));
+std::filesystem::path SteamConfig::expand(const char *path) const {
+  if (path[0] == '~') {
+#ifdef WIN32
+    PWSTR docpath;
+    HRESULT hr = SHGetKnownFolderPath(FOLDERID_Documents, 0, NULL, &docpath);
+    if (SUCCEEDED(hr)) {
+      std::filesystem::path home = docpath;
+      CoTaskMemFree(docpath);
+      return home + (path + 1);
+    }
+#else
+    std::string home = getpwuid(getuid())->pw_dir;
+    return home + (path + 1);
+#endif
+  }
+  return path;
+}
+
+std::filesystem::path SteamConfig::getBase() const {
+  return steamBase;
+}
+
+std::filesystem::path SteamConfig::getTerraria() const {
+  return terrariaBase;
+}
+
+std::unique_ptr<SteamConfig::Element> SteamConfig::parsevdf(const std::filesystem::path &filename) {
+  std::ifstream f(filename, std::ios::in | std::ios::binary);
+  if (f.is_open()) {
+    const auto sz = std::filesystem::file_size(filename);
+    std::string data(sz, '\0');
+    f.read(data.data(), sz);
+    f.close();
+    Tokenizer t { data, 0 };
+    if (t.next() == '"') {
+      return std::make_unique<Element>(&t);
+    }
+  }
+  return nullptr;
+}
+
+SteamConfig::Element::Element() = default;
+
+
+SteamConfig::Element::Element(Tokenizer *t) {
+  name = t->key();
+  if (name.empty()) {  // failed?!
+    return;
+  }
+  std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c){ return std::tolower(c); });
+  switch (t->next()) {
+    case '"':  // string value
+      value = t->key();
+      break;
+    case '{':  // children
+      while (t->next() == '"') {
+        Element e(t);
+        children[e.name] = e;
+      }
+      break;
+  }
+}
+
+char SteamConfig::Tokenizer::next() {
+  pos = data.find_first_of("\"{}", pos);
+  if (pos == data.npos) {
+    return 0;
+  }
+  return data[pos++];
+} 
+
+std::string SteamConfig::Tokenizer::key() {
+  size_t start = pos;
+  // find trailing quote
+  while ((pos = data.find_first_of('"', pos)) != data.npos && data[pos - 1] == '\\') {
+    pos++;
+  }
+  if (pos != data.npos) {
+    pos++;
+    return data.substr(start, pos - 1 - start);
+  }
+  return "";
+}
+
+std::string SteamConfig::Element::find(const std::string &path) const {
+  size_t ofs = path.find_first_of('/');
+  if (ofs == path.npos) {
+    if (auto child = children.find(path); child != children.end()) {
+      return child->second.value;
+    }
+  } else if (auto child = children.find(path.substr(0, ofs)); child != children.end()) {
+    return child->second.find(path.substr(ofs + 1));
+  }
+  return "";
 }

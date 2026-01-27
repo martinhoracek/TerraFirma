@@ -1,0 +1,41 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct buf
+{
+    uint hiliting;
+};
+
+struct main0_out
+{
+    float4 fragColor [[color(0)]];
+};
+
+struct main0_in
+{
+    float2 uv [[user(locn0)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], constant buf& ub [[buffer(0)]], texture2d<float> tex [[texture(0)]], sampler texSmplr [[sampler(0)]])
+{
+    main0_out out = {};
+    float4 c = tex.sample(texSmplr, in.uv);
+    if (ub.hiliting != 0u)
+    {
+        float4 _37 = c;
+        float3 _39 = _37.xyz * float3(0.300000011920928955078125);
+        c.x = _39.x;
+        c.y = _39.y;
+        c.z = _39.z;
+    }
+    float4 _49 = c;
+    float3 _53 = powr(_49.xyz, float3(2.2000000476837158203125));
+    c.x = _53.x;
+    c.y = _53.y;
+    c.z = _53.z;
+    out.fragColor = c;
+    return out;
+}
+

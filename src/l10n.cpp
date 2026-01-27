@@ -1,4 +1,4 @@
-/** @copyright 2020 seancode */
+/** @copyright 2025 Sean Kasun */
 
 /*
  * This crazy chunk of code parses a .Net executable and extracts the
@@ -6,11 +6,10 @@
  * files from terraria.
  */
 
-#include <QSharedPointer>
-#include <QRegularExpression>
-#include <QJsonDocument>
 #include "l10n.h"
 #include "handle.h"
+#include <SDL3/SDL.h>
+#include <regex>
 
 enum {
   TILDE = 0,
@@ -18,93 +17,81 @@ enum {
 };
 
 struct Stream {
-  quint32 offset, size;
+  uint32_t offset, size;
 };
 
 struct Resource {
-  Resource(quint32 name, quint32 offset) : name(name), offset(offset) {}
-  quint32 name, offset;
+  Resource(uint32_t name, uint32_t offset) : name(name), offset(offset) {}
+  uint32_t name, offset;
 };
 
-static quint32 fits0(quint32 v) {
-  return v > 65535 ? 4 : 2;
+static uint32_t fits0(uint32_t v) {
+  return v > 0xffff ? 4 : 2;
 }
-static quint32 fits1(quint32 a, quint32 b) {
-  return qMax(a, b) > 32767 ? 4 : 2;
+static uint32_t fits1(uint32_t a, uint32_t b) {
+  return (a | b) > 0x7fff ? 4 : 2;
 }
-static quint32 fits2(quint32 a, quint32 b, quint32 c, quint32 d = 0) {
-  return qMax(qMax(qMax(a, b), c), d) > 16383 ? 4 : 2;
+static uint32_t fits2(uint32_t a, uint32_t b, uint32_t c, uint32_t d = 0) {
+  return (a | b | c | d) > 0x3fff ? 4 : 2;
 }
-static quint32 fits3(quint32 a, quint32 b, quint32 c = 0, quint32 d = 0,
-                     quint32 e = 0) {
-  return qMax(qMax(qMax(qMax(a, b), c), d), e) > 8192 ? 4 : 2;
+static uint32_t fits3(uint32_t a, uint32_t b, uint32_t c = 0, uint32_t d = 0, uint32_t e = 0) {
+  return (a | b | c | d | e) > 0x1fff ? 4 : 2;
 }
-static quint32 fits5(quint32 a) {
-  return a > 2047 ? 4 : 2;
-}
-
-L10n::L10n() {
-
+static uint32_t fits5(uint32_t a) {
+  return a > 0x7ff ? 4 : 2;
 }
 
-void L10n::load(QString exe) {
-  auto handle = QSharedPointer<Handle>(new Handle(exe));
-  if (!handle->exists()) {
+void L10n::load(std::string exe) {
+  Handle handle(exe);
+  if (!handle.isOpen()) {
     return;
   }
-  if (handle->r16() != 0x5a4d) {  // not an MZ exe
+  if (handle.r16() != 0x5a4d) {  // not an MZ exe
     return;
   }
-  handle->seek(0x3c);
-  handle->seek(handle->r32());
-  if (handle->r32() != 0x4550) {  // not a PE exe
+  handle.seek(0x3c);
+  handle.seek(handle.r32());
+  if (handle.r32() != 0x4550) {  // not a PE exe
     return;
   }
-  handle->skip(2);
-  auto numSections = handle->r16();
-  handle->skip(12);
-  auto headerLen = handle->r16();
-  handle->skip(headerLen + 2);
+  handle.skip(2);
+  auto numSections = handle.r16();
+  handle.skip(12);
+  auto headerLen = handle.r16();
+  handle.skip(headerLen + 2);
   bool found = false;
-  quint32 base, offset;
-  for (quint16 i = 0; i < numSections; i++) {
-    if (handle->read(5) == ".text") {
-      handle->skip(7);
-      base = handle->r32();
-      handle->skip(4);
-      offset = handle->r32();
+  uint32_t base, offset;
+  for (int i = 0; i < numSections; i++) {
+    if (handle.read(5) == ".text") {
+      handle.skip(7);
+      base = handle.r32();
+      handle.skip(4);
+      offset = handle.r32();
       found = true;
       break;
     }
-    handle->skip(35);
+    handle.skip(35);
   }
   if (!found) {  // doesn't contain a .text segment
     return;
   }
-  handle->seek(offset + 0x10);
-  quint32 metaRVA = handle->r32();
-  handle->skip(12);
-  quint32 resourceRVA = handle->r32();
+  handle.seek(offset + 0x10);
+  auto metaRVA = handle.r32();
+  handle.skip(12);
+  auto resourceRVA = handle.r32();
 
-  handle->seek(metaRVA + offset - base + 0xc);
-  quint32 verLen = handle->r32();
-  handle->skip(verLen + 2);
+  handle.seek(metaRVA + offset - base + 0xc);
+  auto verLen = handle.r32();
+  handle.skip(verLen + 2);
   Stream streams[2];
-  quint16 numStreams = handle->r16();
-  for (quint16 i = 0; i < numStreams; i++) {
-    quint32 strOfs = handle->r32();
-    quint32 strSize = handle->r32();
+  auto numStreams = handle.r16();
+  for (int i = 0; i < numStreams; i++) {
+    auto strOfs = handle.r32();
+    auto strSize = handle.r32();
     int type = -1;
-    QString tname;
-    quint8 ch;
-    do {
-      ch = handle->r8();
-      if (ch) {
-        tname += QChar(ch);
-      }
-    } while (ch);
-    while (handle->tell() & 3) {
-      handle->skip(1);
+    std::string tname = handle.rcs();
+    while (handle.tell() & 3) {
+      handle.skip(1);
     }
     if (tname == "#~") {
       type = TILDE;
@@ -116,17 +103,17 @@ void L10n::load(QString exe) {
       streams[type].size = strSize;
     }
   }
-  handle->seek(metaRVA + streams[TILDE].offset + offset - base + 6);
-  auto indexWidths = handle->r16();
+  handle.seek(metaRVA + streams[TILDE].offset + offset - base + 6);
+  auto indexWidths = handle.r16();
   int strWidth = (indexWidths & 1) ? 4 : 2;
   int guidWidth = (indexWidths & 2) ? 4 : 2;
   int blobWidth = (indexWidths & 4) ? 4 : 2;
-  auto tables = handle->r64();
-  handle->skip(8);
-  quint32 rows[64];
+  auto tables = handle.r64();
+  handle.skip(8);
+  uint32_t rows[64];
   for (int i = 0; i < 64; i++) {
     if (tables & 1) {
-      rows[i] = handle->r32();
+      rows[i] = handle.r32();
     } else {
       rows[i] = 0;
     }
@@ -135,11 +122,11 @@ void L10n::load(QString exe) {
 
   const int TypeDefOrRef = fits2(rows[1], rows[2], rows[27]);
   const int MethodDefOrRef = fits1(rows[6], rows[10]);
-  quint32 CustomAttr = rows[0];
+  uint32_t CustomAttr = rows[0];
   int customRows[] = {
     1, 2, 4, 6, 8, 9, 10, 17, 20, 23, 26, 27, 32, 35, 38, 39, 40
   };
-  for (quint16 i = 0; i < sizeof(customRows) / sizeof(customRows[0]); i++) {
+  for (int i = 0; i < SDL_arraysize(customRows); i++) {
     if (rows[customRows[i]] > CustomAttr) {
       CustomAttr = rows[customRows[i]];
     }
@@ -148,7 +135,7 @@ void L10n::load(QString exe) {
    * Ugh, in order to seek into the stream, you need to handle all the types
    * in order.  Since we want resources, which is type 40, we need to
    * calculate the sizes of types 0 - 39. */
-  quint32 skip =
+  uint32_t skip =
       // Module
       rows[0] * (2 + strWidth + guidWidth * 3) +
       // TypeRef
@@ -216,81 +203,85 @@ void L10n::load(QString exe) {
       rows[38] * (4 + strWidth + blobWidth) +
       // ExportedType
       rows[39] * (8 + strWidth * 2 + fits2(rows[35], rows[38], rows[39]));
-  handle->skip(skip);
-  quint32 resLen = fits2(rows[35], rows[38], rows[39]);
-  QList<QSharedPointer<Resource>> resources;
-  for (quint32 i = 0; i < rows[40]; i++) {
-    quint32 ofs = handle->r32();
-    handle->skip(4);
-    quint32 name = strWidth == 4 ? handle->r32() : handle->r16();
-    handle->skip(resLen);
-    resources.append(QSharedPointer<Resource>(new Resource(name, ofs)));
+  handle.skip(skip);
+  uint32_t resLen = fits2(rows[35], rows[38], rows[39]);
+  std::vector<std::shared_ptr<Resource>> resources;
+  for (int i = 0; i < rows[40]; i++) {
+    uint32_t ofs = handle.r32();
+    handle.skip(4);
+    uint32_t name = strWidth == 4 ? handle.r32() : handle.r16();
+    handle.skip(resLen);
+    resources.push_back(std::make_shared<Resource>(name, ofs));
   }
-  handle->seek(metaRVA + streams[STRINGS].offset + offset - base);
-  static QRegularExpression re("Terraria\\.Localization\\.Content\\.([^.]+)\\.([^.]+)\\.json");
+  handle.seek(metaRVA + streams[STRINGS].offset + offset - base);
+  std::regex re("Terraria\\.Localization\\.Content\\.([^.]+)\\.([^.]+)\\.json");
   for (const auto &r : resources) {
-    handle->seek(metaRVA + streams[STRINGS].offset + offset - base + r->name);
-    auto name = handle->rcs();
-    auto match = re.match(name);
-    if (match.hasMatch()) {
-      auto lang = match.captured(1);
-
-      handle->seek(r->offset + resourceRVA + offset - base);
-      auto len = handle->r32();
-
-      QString raw = QString::fromUtf8(handle->readBytes(len), len);
-      static QRegularExpression comma(",\\s*}");
-      raw.replace(comma, "}");  // remove trailing commas
-      QJsonParseError error;
-      QJsonDocument doc = QJsonDocument::fromJson(raw.toUtf8(), &error);
-      if (!doc.isNull() && doc.isObject()) {
-        auto root = doc.object();
+    handle.seek(metaRVA + streams[STRINGS].offset + offset - base + r->name);
+    auto name = handle.rcs();
+    std::cmatch match;
+    if (std::regex_search(name.c_str(), match, re)) {
+      if (match[2] == "Items" || match[2] == "NPCs") {
+        std::string lang = match[1].str();
         languages.insert(lang);
-        if (match.captured(2) == "Items") {
-          items[lang] = root.value("ItemName").toObject();
-          prefixes[lang] = root.value("Prefix").toObject();
-        } else if (match.captured(2) == "NPCs") {
-          npcs[lang] = root.value("NPCName").toObject();
+        if (lang == currentLanguage) {
+          handle.seek(r->offset + resourceRVA + offset - base);
+          auto len = handle.r32();
+
+          std::string raw = handle.read(len);
+          std::regex comma(",\\s*\\}");
+          raw = std::regex_replace(raw, comma, "}");  // remove trailing commas
+          auto doc = JSON::parse(raw);
+          if (doc) {
+            if (match[2] == "Items") {
+              items.emplace(lang, doc->at("ItemName"));
+              prefixes.emplace(lang, doc->at("Prefix"));
+            } else if (match[2] == "NPCs") {
+              npcs.emplace(lang, doc->at("NPCName"));
+            }
+          }
         }
       }
     }
   }
 }
 
-void L10n::setLanguage(QString lang) {
+void L10n::setLanguage(std::string lang) {
   currentLanguage = lang;
 }
 
-QList<QString> L10n::getLanguages() {
-#if QT_VERSION < 0x060000
-  return QList<QString>::fromSet(languages);
-#else
-  QList<QString> qList(languages.begin(), languages.end());
-  return qList;
-#endif
+std::string L10n::selectedLanguage() const {
+  return currentLanguage;
 }
 
-QString L10n::xlateItem(const QString &key) {
-  auto str = items[currentLanguage].value(key).toString(key);
-  static QRegularExpression re("{\\$ItemName\\.(.+?)}");
-  auto match = re.match(str);
-  if (match.hasMatch()) {
-    str.replace(re, xlateItem(match.captured(1)));
+std::vector<std::string> L10n::getLanguages() const {
+  std::vector<std::string> v;
+  v.assign(languages.begin(), languages.end());
+  return v;
+}
+
+std::string L10n::xlateItem(const std::string &key) const {
+  auto str = items.at(currentLanguage)->at(key)->asString();
+  std::regex re("\\{\\$ItemName\\.(.+?)\\}");
+  std::cmatch match;
+  if (std::regex_search(str.c_str(), match, re)) {
+    str = std::regex_replace(str, re, xlateItem(match[1]));
+  }
+  if (str.length() == 0) {
+    return key;
   }
   return str;
 }
 
-QString L10n::xlatePrefix(const QString &key) {
-  return prefixes[currentLanguage].value(key).toString(key);
+std::string L10n::xlatePrefix(const std::string &key) const {
+  return prefixes.at(currentLanguage)->at(key)->asString();
 }
 
-QString L10n::xlateNPC(const QString &key) {
-  auto str = npcs[currentLanguage].value(key).toString(key);
-  static QRegularExpression re("{\\$NPCName\\.(.+?)}");
-  auto match = re.match(str);
-  if (match.hasMatch()) {
-    str.replace(re, xlateNPC(match.captured(1)));
+std::string L10n::xlateNPC(const std::string &key) const {
+  auto str = npcs.at(currentLanguage)->at(key)->asString();
+  std::regex re("\\{\\$NPCName\\.(.+?)\\}");
+  std::cmatch match;
+  if (std::regex_search(str.c_str(), match, re)) {
+    str = std::regex_replace(str, re, xlateNPC(match[1]));
   }
   return str;
 }
-

@@ -1,148 +1,120 @@
-/** @Copyright 2015 seancode */
+/** @copyright 2025 Sean Kasun */
 
 #pragma once
 
-#include <QObject>
-#include <QRunnable>
-#include <QMap>
-#include "./worldinfo.h"
-#include "./worldheader.h"
-#include "./handle.h"
+#include "SDL3/SDL_mutex.h"
+#include "handle.h"
+#include "worldheader.h"
+#include "worldinfo.h"
+#include "tiles.h"
 
-class Tile {
- public:
-  qint16 u, v, wallu, wallv, type, wall;
-  quint8 liquid, color, wallColor, slope;
-  int load(const QSharedPointer<Handle> &handle, int version,
-           const QList<bool> &extra);
-  bool active() const;
-  bool lava() const;
-  bool honey() const;
-  bool shimmer() const;
-  bool seen() const;
-  void setSeen(bool seen);
-  bool redWire() const;
-  bool blueWire() const;
-  bool greenWire() const;
-  bool yellowWire() const;
-  bool half() const;
-  bool actuator() const;
-  bool inactive() const;
+class World {
+  public:
+    bool load(const std::string &filename, SDL_Mutex *mutex);
+    std::string progress();
+    int tilesWide, tilesHigh;
+    WorldInfo info;
+    WorldHeader header;
+    Tile *tiles;
+    uint8_t *colors;
+    bool loaded = false;
 
- private:
-  quint16 flags;
-};
-
-
-class World : public QObject, public QRunnable {
-  static const int MinimumVersion = 88;
-  static const int HighestVersion = 279;
-
-
-  Q_OBJECT
-
- public:
-  struct Chest {
-    struct Item {
-      qint16 stack;
-      QString name;
-      QString prefix;
+    struct Chest {
+      struct Item {
+        int16_t stack;
+        std::string name;
+        std::string prefix;
+      };
+      int32_t x, y;
+      std::string name;
+      std::vector<Item> items;
     };
-    qint32 x, y;
-    QString name;
-    QList<Item> items;
-  };
 
-  struct Sign {
-    qint32 x, y;
-    QString text;
-  };
+    struct Sign {
+      int32_t x, y;
+      std::string text;
+    };
 
-  struct NPC {
-    QString title;
-    QString name;
-    float x, y;
-    bool homeless;
-    qint32 homeX, homeY;
-    qint32 townVariation;
-    qint16 sprite;
-    qint16 head;
-    qint16 order;
-  };
+    struct NPC {
+      std::string title;
+      std::string name;
+      float x, y;
+      bool homeless, homelessDespawn;
+      int32_t homeX, homeY;
+      int32_t townVariation;
+      int16_t sprite;
+      int16_t head;
+      int16_t order;
+    };
 
-  struct Entity {
-    qint32 id;
-    qint16 x, y;
-  };
+    struct Entity {
+      int32_t id;
+      int16_t x, y;
+    };
 
-  struct TrainingDummy : Entity {
-    qint16 npc;
-  };
+    struct TrainingDummy : Entity {
+      int16_t npc;
+    };
 
-  struct ItemFrame : Entity {
-    qint16 itemid;
-    quint8 prefix;
-    qint16 stack;
-  };
+    struct ItemFrame : Entity {
+      int16_t itemid;
+      uint8_t prefix;
+      int16_t stack;
+    };
 
-  struct LogicSensor : Entity {
-    quint8 type;
-    bool on;
-  };
+    struct LogicSensor : Entity {
+      int8_t type;
+      bool on;
+    };
 
-  class InitException {
-   public:
-    InitException(QString const title, QString const reason)
-        : title(title), reason(reason) {}
-    QString title, reason;
-  };
+    struct DisplayDoll : Entity {
+      uint16_t armor[8];
+      uint16_t dye[8];
+    };
 
-  explicit World(QObject *parent = nullptr);
-  virtual ~World();
-  void init();
-  void setFilename(QString filename);
-  void setPlayer(QString filename);
+    struct WeaponsRack : Entity {
+      uint16_t item;
+    };
 
-  Tile *tiles;
-  QList<Chest> chests;
-  QList<Sign> signs;
-  QList<NPC> npcs;
-  QMap<qint32, bool> shimmered;
-  QList<Entity> entities;
-  QMap<QString, qint32> kills;
-  QList<QString> seen;
-  QList<QString> chats;
+    struct HatRack : Entity {
+      uint16_t hats[2];
+      uint16_t dyes[2];
+    };
 
-  int tilesWide, tilesHigh;
-  WorldHeader header;
-  WorldInfo info;
+    struct FoodPlatter : Entity {
+      uint16_t item;
+    };
 
- signals:
-  void loaded(bool loaded);
-  void status(QString msg);
-  void loadError(QString reason);
+    std::vector<DisplayDoll> dolls;
+    std::vector<NPC> npcs;
+    std::vector<Chest> chests;
+    std::vector<Sign> signs;
+    std::unordered_map<std::string, int32_t> kills;
+    std::vector<std::string> seen;
+    std::vector<std::string> chats;
 
- protected:
-  void run() override;
+  private:
+    void loadHeader(std::shared_ptr<Handle> handle, int version);
+    void loadTiles(std::shared_ptr<Handle> handle, int version, std::vector<bool> &extra);
+    void loadChests(std::shared_ptr<Handle> handle, int version);
+    void loadSigns(std::shared_ptr<Handle> handle);
+    void loadNPCs(std::shared_ptr<Handle> handle, int version);
+    void loadDummies(std::shared_ptr<Handle> handle);
+    void loadEntities(std::shared_ptr<Handle> handle);
+    void loadBestiary(std::shared_ptr<Handle> handle);
+    void mapColor(const Tile &tile, uint8_t *color, int y);
+    void render();
+    void setProgress(std::string msg, SDL_Mutex *mutex);
 
- private:
-  void loadHeader(QSharedPointer<Handle> handle, int version);
-  void loadTiles(const QSharedPointer<Handle> &handle, int version,
-                 const QList<bool> &extra);
-  void loadChests(const QSharedPointer<Handle> &handle, int version);
-  void loadSigns(const QSharedPointer<Handle> &handle, int version);
-  void loadNPCs(const QSharedPointer<Handle> &handle, int version);
-  void loadDummies(const QSharedPointer<Handle> &handle, int version);
-  void loadEntities(const QSharedPointer<Handle> &handle, int version);
-  void loadPressurePlates(const QSharedPointer<Handle> &handle, int version);
-  void loadTownManager(const QSharedPointer<Handle> &handle, int version);
-  void loadBestiary(const QSharedPointer<Handle> &handle, int version);
-  void loadCreativePowers(const QSharedPointer<Handle> &handle, int version);
-  void spreadLight();
-  void loadPlayer();
-  void loadPlayer1(QSharedPointer<Handle> handle, int version);
-  void loadPlayer2(QSharedPointer<Handle> handle, int version);
+    std::vector<ItemFrame> itemFrames;
+    std::vector<HatRack> hatRacks;
+    std::vector<WeaponsRack> weaponRacks;
+    std::unordered_map<uint32_t, bool> shimmered;
 
-  QString filename;
-  QString player;
+    int groundLevel, rockLevel, hellLevel;
+
+    std::string player;
+    SDL_Mutex *loadLock;
+    std::string loadProgress;
 };
+

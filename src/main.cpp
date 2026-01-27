@@ -1,36 +1,18 @@
-/**
- * @Copyright 2015 seancode
- *
- * Main application
- */
+/** @copyright 2025 Sean Kasun */
 
-#include <QApplication>
-#include <QTranslator>
-#include <QSurfaceFormat>
-#include "mainwindow.h"
+#include "terrafirma.h"
 
-int main(int argc, char *argv[]) {
-  QSurfaceFormat format = QSurfaceFormat::defaultFormat();
-  format.setSamples(4);  // 4xaa
-  format.setVersion(3, 3);
-  format.setProfile(QSurfaceFormat::CoreProfile);
-  QSurfaceFormat::setDefaultFormat(format);
+int main(int, char **) {
 
-  QApplication app(argc, argv);
+  Terrafirma terrafirma;
 
-  QString locale = QLocale::system().name();
+  terrafirma.init();
 
-  QTranslator translator;
-  translator.load(QString("terrafirma_")+locale);
-  QApplication::installTranslator(&translator);
+  terrafirma.run();
 
-  QApplication::setApplicationName("Terrafirma");
-  QApplication::setApplicationVersion("3.1.13");
-  QApplication::setOrganizationName("seancode");
-  QApplication::setWindowIcon(QIcon(":/res/terrafirma.png"));
+  terrafirma.shutdown();
 
-  MainWindow w;
-  w.show();
-
-  return QApplication::exec();
+  return 0;
 }
+
+

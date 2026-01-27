@@ -1,19 +1,16 @@
-/**
- * @Copyright 2015 seancode
- *
- * Handles the automatic UV rules for tiles and walls
- */
+/** @copyright 2025 Sean Kasun */
 
-#include <QDebug>
-#include <QRandomGenerator>
-#include "./uvrules.h"
-#include "./world.h"
+#include "uvrules.h"
+#include "tiles.h"
+#include "world.h"
+#include <cstdlib>
 
+// rules for setting uvs various types of blocks based on surrounding tiles
 
 struct UVRule {
-  quint16 mask, val;
-  quint16 uvs[6];
-  quint8 blend;
+  uint16_t mask, val;
+  uint16_t uvs[6];
+  uint8_t blend;
 };
 
 static const UVRule grassRules[] = {
@@ -127,7 +124,6 @@ static const UVRule noGrassRules[] = {
   {0x00fe, 0x00f8, {234,  54, 252,  54, 270,  54}, 2}
 };
 
-
 static const UVRule uvRules[] = {
   {0x50ff, 0x00ff, {108, 18, 126, 18, 144, 18}, 0},
   {0x05ff, 0x00ff, {108, 36, 126, 36, 144, 36}, 0},
@@ -215,130 +211,104 @@ static const int walluvs[][8] = {
   {396,   0, 396,  36, 396,  72, 396, 180}
 };
 
-void UVRules::fixWall(const QSharedPointer<World> &world, int x, int y) {
-  int stride = world->tilesWide;
-  int offset = y * stride + x;
-  int mask = 0;
-  if (y > 0) {
-    auto top = &world->tiles[offset - stride];
-    if (top->wall || (top->active() && top->type == 54))
-      mask |= 1;
-  }
-  if (x > 0) {
-    auto left = &world->tiles[offset - 1];
-    if (left->wall || (left->active() && left->type == 54))
-      mask |= 2;
-  }
-  if (x < world->tilesWide - 1) {
-    auto right = &world->tiles[offset + 1];
-    if (right->wall || (right->active() && right->type == 54))
-      mask |= 4;
-  }
-  if (y < world->tilesHigh - 1) {
-    auto bottom = &world->tiles[offset + stride];
-    if (bottom->wall || (bottom->active() && bottom->type == 54))
-      mask |= 8;
-  }
-  int set;
-
-  auto tile = &world->tiles[offset];
-
-  switch (world->info.walls[tile->wall]->large) {
-    case 1:
-      set = (phlebasTiles[y % 4][x % 3] - 1) * 2;
-      break;
-    case 2:
-      set = (lazureTiles[x % 2][y % 2] - 1) * 2;
-      break;
-    default:
-      QRandomGenerator *rp = QRandomGenerator::system();
-      set = (rp->generate() % 3 ) * 2;
-      break;
-  }
-
-  if (mask == 15)
-    mask += wallRandom[x % 3][y % 3];
-
-  tile->wallu = walluvs[mask][set];
-  tile->wallv = walluvs[mask][set + 1];
-}
-
-quint8 UVRules::fixTile(const QSharedPointer<World> &world, int x, int y) {
+uint8_t UVRules::mapTile(const World &world, int x, int y) {
   int t = -1, l = -1, r = -1, b = -1;
   int tl = -1, tr = -1, bl = -1, br = -1;
 
-  int stride = world->tilesWide;
+  int stride = world.tilesWide;
   int offset = y * stride + x;
 
-  auto tile = &world->tiles[offset];
-  qint16 c = tile->type;
-  if (world->info[c]->stone) c = 1;
+  const auto &tile = world.tiles[offset];
+  int16_t c = tile.type;
+  if (world.info[c]->stone) {
+    c = TileStone;
+  }
 
-  if (c == 80) {  // cactus
-    fixCactus(world, x, y);
+  if (c == TileCactus) {
+    mapCactus(world, x, y);
     return 0;
   }
 
-
   if (x > 0) {
-    auto left = &world->tiles[offset - 1];
-    if (left->active() && left->slope != 1 && left->slope != 3) {
-      l = left->type;
-      if (world->info[l]->stone) l = 1;
+    const auto &left = world.tiles[offset - 1];
+    if (left.active() && left.slope != 1 && left.slope != 3) {
+      l = left.type;
+      if (world.info[l]->stone) {
+        l = TileStone;
+      }
     }
-    if (y > 0 && world->tiles[offset - stride - 1].active()) {
-      tl = world->tiles[offset - stride - 1].type;
-      if (world->info[tl]->stone) tl = 1;
+    if (y > 0 && world.tiles[offset - stride - 1].active()) {
+      tl = world.tiles[offset - stride - 1].type;
+      if (world.info[tl]->stone) {
+        tl = TileStone;
+      }
     }
-    if (y < world->tilesHigh - 1 &&
-        world->tiles[offset + stride - 1].active()) {
-      bl = world->tiles[offset + stride - 1].type;
-      if (world->info[bl]->stone) bl = 1;
+    if (y < world.tilesHigh - 1 && world.tiles[offset + stride - 1].active()) {
+      bl = world.tiles[offset + stride - 1].type;
+      if (world.info[bl]->stone) {
+        bl = TileStone;
+      }
     }
   }
-  if (x < world->tilesWide - 1) {
-    auto right = &world->tiles[offset + 1];
-    if (right->active() && right->slope != 2 && right->slope != 4) {
-      r = right->type;
-      if (world->info[r]->stone) r = 1;
+  if (x < world.tilesWide - 1) {
+    const auto &right = world.tiles[offset + 1];
+    if (right.active() && right.slope != 2 && right.slope != 4) {
+      r = right.type;
+      if (world.info[r]->stone) {
+        r = TileStone;
+      }
     }
-    if (y > 0 && world->tiles[offset - stride + 1].active()) {
-      tr = world->tiles[offset - stride + 1].type;
-      if (world->info[tr]->stone) tr = 1;
+    if (y > 0 && world.tiles[offset - stride + 1].active()) {
+      tr = world.tiles[offset - stride + 1].type;
+      if (world.info[tr]->stone) {
+        tr = TileStone;
+      }
     }
-    if (y < world->tilesHigh - 1 &&
-        world->tiles[offset + stride + 1].active()) {
-      br = world->tiles[offset + stride + 1].type;
-      if (world->info[br]->stone) br = 1;
+    if (y < world.tilesHigh - 1 && world.tiles[offset + stride + 1].active()) {
+      br = world.tiles[offset + stride + 1].type;
+      if (world.info[br]->stone) {
+        br = TileStone;
+      }
     }
   }
   if (y > 0) {
-    auto top = &world->tiles[offset - stride];
-    if (top->active() && top->slope != 3 && top->slope != 4) {
-      t = top->type;
-      if (world->info[t]->stone) t = 1;
+    const auto &top = world.tiles[offset - stride];
+    if (top.active() && top.slope != 3 && top.slope != 4) {
+      t = top.type;
+      if (world.info[t]->stone) {
+        t = TileStone;
+      }
     }
   }
-  if (y < world->tilesHigh - 1) {
-    auto bottom = &world->tiles[offset + stride];
-    if (bottom->active() && bottom->slope != 1 && bottom->slope != 2) {
-      b = bottom->type;
-      if (world->info[b]->stone) b = 1;
+  if (y < world.tilesHigh - 1) {
+    const auto &bottom = world.tiles[offset + stride];
+    if (bottom.active() && bottom.slope != 1 && bottom.slope != 2) {
+      b = bottom.type;
+      if (world.info[b]->stone) {
+        b = TileStone;
+      }
     }
   }
-
 
   // fix slopes
-  switch (tile->slope) {
-    case 1: t = r = -1; break;
-    case 2: t = l = -1; break;
-    case 3: b = r = -1; break;
-    case 4: b = l = -1; break;
+  switch (tile.slope) {
+    case 1:
+      t = r = TileAir;
+      break;
+    case 2:
+      t = l = TileAir;
+      break;
+    case 3:
+      b = r = TileAir;
+      break;
+    case 4:
+      b = l = TileAir;
+      break;
   }
 
-  // check blends and merges (blends should be first)
-  for (auto const &blend : world->info[c]->blends) {
-    quint8 dir = 0;
+  // check blends and merges
+  for (const auto &blend : world.info[c]->blends) {
+    uint8_t dir = 0;
     if (blend.hasTile) {
       dir |= t == blend.tile ? 8 : 0;
       dir |= b == blend.tile ? 4 : 0;
@@ -349,295 +319,460 @@ quint8 UVRules::fixTile(const QSharedPointer<World> &world, int x, int y) {
       dir |= bl == blend.tile ? 0x20 : 0;
       dir |= br == blend.tile ? 0x10 : 0;
     } else {
-      dir |= (t > -1 && (world->info[t]->mask & blend.mask)) ? 8 : 0;
-      dir |= (b > -1 && (world->info[b]->mask & blend.mask)) ? 4 : 0;
-      dir |= (l > -1 && (world->info[l]->mask & blend.mask)) ? 2 : 0;
-      dir |= (r > -1 && (world->info[r]->mask & blend.mask)) ? 1 : 0;
-      dir |= (tl > -1 && (world->info[tl]->mask & blend.mask)) ? 0x80 : 0;
-      dir |= (tr > -1 && (world->info[tr]->mask & blend.mask)) ? 0x40 : 0;
-      dir |= (bl > -1 && (world->info[bl]->mask & blend.mask)) ? 0x20 : 0;
-      dir |= (br > -1 && (world->info[br]->mask & blend.mask)) ? 0x10 : 0;
+      dir |= (t > TileAir && (world.info[t]->mask & blend.mask)) ? 8 : 0;
+      dir |= (b > TileAir && (world.info[b]->mask & blend.mask)) ? 4 : 0;
+      dir |= (l > TileAir && (world.info[l]->mask & blend.mask)) ? 2 : 0;
+      dir |= (r > TileAir && (world.info[r]->mask & blend.mask)) ? 1 : 0;
+      dir |= (tl > TileAir && (world.info[tl]->mask & blend.mask)) ? 0x80 : 0;
+      dir |= (tr > TileAir && (world.info[tr]->mask & blend.mask)) ? 0x40 : 0;
+      dir |= (bl > TileAir && (world.info[bl]->mask & blend.mask)) ? 0x20 : 0;
+      dir |= (br > TileAir && (world.info[br]->mask & blend.mask)) ? 0x10 : 0;
     }
     dir &= blend.direction;
+    int target = blend.blend ? TileBlend : c;
 
-    if ((dir & 8) && (!blend.recursive || (fixTile(world, x, y - 1) & 4)))
-      t = blend.blend ? -2 : c;
-    if ((dir & 4) && (!blend.recursive || (fixTile(world, x, y + 1) & 8)))
-      b = blend.blend ? -2 : c;
-    if ((dir & 2) && (!blend.recursive || (fixTile(world, x - 1, y) & 1)))
-      l = blend.blend ? -2 : c;
-    if ((dir & 1) && (!blend.recursive || (fixTile(world, x + 1, y) & 2)))
-      r = blend.blend ? -2 : c;
-    if (dir & 0x80) tl = blend.blend ? -2 : c;
-    if (dir & 0x40) tr = blend.blend ? -2 : c;
-    if (dir & 0x20) bl = blend.blend ? -2 : c;
-    if (dir & 0x10) br = blend.blend ? -2 : c;
-  }
-  if (world->info[c]->brick) {  // brick merges with brick
-    if (t > -1 && world->info[t]->brick) t = c;
-    if (b > -1 && world->info[b]->brick) b = c;
-    if (l > -1 && world->info[l]->brick) l = c;
-    if (r > -1 && world->info[r]->brick) r = c;
-    if (tl > -1 && world->info[tl]->brick) tl = c;
-    if (tr > -1 && world->info[tr]->brick) tr = c;
-    if (bl > -1 && world->info[bl]->brick) bl = c;
-    if (br > -1 && world->info[br]->brick) br = c;
-  }
-  if (world->info[c]->pile) {  // pile merges with pile
-    if (t > -1 && world->info[t]->pile) t = c;
-    if (b > -1 && world->info[b]->pile) b = c;
-    if (l > -1 && world->info[l]->pile) l = c;
-    if (r > -1 && world->info[r]->pile) r = c;
-    if (tl > -1 && world->info[tl]->pile) tl = c;
-    if (tr > -1 && world->info[tr]->pile) tr = c;
-    if (bl > -1 && world->info[bl]->pile) bl = c;
-    if (br > -1 && world->info[br]->pile) br = c;
-  }
-  if (world->info[c]->dirt) {
-    if (t == 0) t = -2;
-    if (b == 0) b = -2;
-    if (l == 0) l = -2;
-    if (r == 0) r = -2;
-    if (tl == 0) tl = -2;
-    if (tr == 0) tr = -2;
-    if (bl == 0) bl = -2;
-    if (br == 0) br = -2;
-  }
-  // everything merges with 357
-  if (t == 357) t = c;
-  if (b == 357) b = c;
-  if (l == 357) l = c;
-  if (r == 357) r = c;
-  if (tl == 357) tl = c;
-  if (tr == 357) tr = c;
-  if (bl == 357) bl = c;
-  if (br == 357) br = c;
-  // fix rope
-  if (c == 213) {
-    if (t != c) {
-      if (l > -1 && world->info[l]->solid) l = c;
-      if (r > -1 && world->info[r]->solid) r = c;
+    if ((dir & 8) && (!blend.recursive || (mapTile(world, x, y - 1) & 4))) {
+      t = target;
+    }
+    if ((dir & 4) && (!blend.recursive || (mapTile(world, x, y + 1) & 8))) {
+      b = target;
+    }
+    if ((dir & 2) && (!blend.recursive || (mapTile(world, x - 1, y) & 1))) {
+      l = target;
+    }
+    if ((dir & 1) && (!blend.recursive || (mapTile(world, x + 1, y) & 2))) {
+      r = target;
+    }
+    if (dir & 0x80) {
+      tl = target;
+    }
+    if (dir & 0x40) {
+      tr = target;
+    }
+    if (dir & 0x20) {
+      bl = target;
+    }
+    if (dir & 0x10) {
+      br = target;
     }
   }
-  // fix cobweb
-  if (c == 51) {
-    if (t > -1) t = c;
-    if (b > -1) b = c;
-    if (l > -1) l = c;
-    if (r > -1) r = c;
-    if (tl > -1) tl = c;
-    if (tr > -1) tr = c;
-    if (bl > -1) bl = c;
-    if (br > -1) br = c;
+
+  if (world.info[c]->brick) {
+    if (t > TileAir && world.info[t]->brick) {
+      t = c;
+    }
+    if (b > TileAir && world.info[b]->brick) {
+      b = c;
+    }
+    if (l > TileAir && world.info[l]->brick) {
+      l = c;
+    }
+    if (r > TileAir && world.info[r]->brick) {
+      r = c;
+    }
+    if (tl > TileAir && world.info[tl]->brick) {
+      tl = c;
+    }
+    if (tr > TileAir && world.info[tr]->brick) {
+      tr = c;
+    }
+    if (bl > TileAir && world.info[bl]->brick) {
+      bl = c;
+    }
+    if (br > TileAir && world.info[br]->brick) {
+      br = c;
+    }
+  }
+
+  if (world.info[c]->pile) {
+    if (t > TileAir && world.info[t]->pile) {
+      t = c;
+    }
+    if (b > TileAir && world.info[b]->pile) {
+      b = c;
+    }
+    if (l > TileAir && world.info[l]->pile) {
+      l = c;
+    }
+    if (r > TileAir && world.info[r]->pile) {
+      r = c;
+    }
+    if (tl > TileAir && world.info[tl]->pile) {
+      tl = c;
+    }
+    if (tr > TileAir && world.info[tr]->pile) {
+      tr = c;
+    }
+    if (bl > TileAir && world.info[bl]->pile) {
+      bl = c;
+    }
+    if (br > TileAir && world.info[br]->pile) {
+      br = c;
+    }
+  }
+
+  if (world.info[c]->dirt) {
+    if (t == TileDirt) {
+      t = TileBlend;
+    }
+    if (b == TileDirt) {
+      b = TileBlend;
+    }
+    if (l == TileDirt) {
+      l = TileBlend;
+    }
+    if (r == TileDirt) {
+      r = TileBlend;
+    }
+    if (tl == TileDirt) {
+      tl = TileBlend;
+    }
+    if (tr == TileDirt) {
+      tr = TileBlend;
+    }
+    if (bl == TileDirt) {
+      bl = TileBlend;
+    }
+    if (br == TileDirt) {
+      br = TileBlend;
+    }
+  }
+
+  // everything blends with smooth marble
+  if (t == TileSmoothMarble) {
+    t = c;
+  }
+  if (b == TileSmoothMarble) {
+    b = c;
+  }
+  if (l == TileSmoothMarble) {
+    l = c;
+  }
+  if (r == TileSmoothMarble) {
+    r = c;
+  }
+  if (tl == TileSmoothMarble) {
+    tl = c;
+  }
+  if (tr == TileSmoothMarble) {
+    tr = c;
+  }
+  if (bl == TileSmoothMarble) {
+    bl = c;
+  }
+  if (br == TileSmoothMarble) {
+    br = c;
+  }
+  if (c == TileRope) {
+    if (t != c) {
+      if (l > TileAir && world.info[l]->solid) {
+        l = c;
+      }
+      if (r > TileAir && world.info[r]->solid) {
+        r = c;
+      }
+    }
+  }
+  if (c == TileCobweb) {
+    if (t > TileAir) {
+      t = c;
+    }
+    if (b > TileAir) {
+      b = c;
+    }
+    if (l > TileAir) {
+      l = c;
+    }
+    if (r > TileAir) {
+      r = c;
+    }
+    if (tl > TileAir) {
+      tl = c;
+    }
+    if (tr > TileAir) {
+      tr = c;
+    }
+    if (bl > TileAir) {
+      bl = c;
+    }
+    if (br > TileAir) {
+      br = c;
+    }
   }
 
   // slope and half rules
-  if ((tile->slope == 1 || tile->slope == 2) && b > -1 && b != 19) b = c;
-  if (t > -1) {
-    auto top = &world->tiles[offset - stride];
-    if ((top->slope == 1 || top->slope == 2) && t != 19) t = c;
-    if (top->half() && t != 19) t = c;
+  if ((tile.slope == 1 || tile.slope == 2) && b > TileAir && b != TilePlatforms) {
+    b = c;
   }
-  if ((tile->slope == 3 || tile->slope == 4) && t > -1 && t != 19) t = c;
-  if (b > -1) {
-    auto bottom = &world->tiles[offset + stride];
-    if ((bottom->slope == 3 || bottom->slope == 4) && b != 19) b = c;
-    if (bottom->half()) b = -1;
-  }
-  if (l > -1) {
-    auto left = &world->tiles[offset - 1];
-    if (left->half()) {
-      if (tile->half()) l = c;
-      else if (left->type != c) l = -1;
+  if (t > TileAir) {
+    const auto &top = world.tiles[offset - stride];
+    if ((top.slope == 1 || top.slope == 2) && t != TilePlatforms) {
+      t = c;
+    }
+    if (top.half() && t != TilePlatforms) {
+      t = c;
     }
   }
-  if (r > -1) {
-    auto right = &world->tiles[offset + 1];
-    if (right->half()) {
-      if (tile->half()) r = c;
-      else if (right->type != c) r = -1;
+  if ((tile.slope == 3 || tile.slope == 4) && t > TileAir && t != TilePlatforms) {
+    t = c;
+  }
+  if (b > TileAir) {
+    const auto &bottom = world.tiles[offset + stride];
+    if ((bottom.slope == 3 || bottom.slope == 4) && b != TilePlatforms) {
+      b = c;
+      if (bottom.half()) {
+        b = TileAir;
+      }
     }
   }
-  if (tile->half()) {
-    if (l != c) l = -1;
-    if (r != c) r = -1;
-    t = -1;
+  if (l > TileAir) {
+    const auto &left = world.tiles[offset - 1];
+    if (left.half()) {
+      if (tile.half()) {
+        l = c;
+      } else if (left.type != c) {
+        l = TileAir;
+      }
+    }
+  }
+  if (r > TileAir) {
+    const auto &right = world.tiles[offset + 1];
+    if (right.half()) {
+      if (tile.half()) {
+        r = c;
+      } else if (right.type != c) {
+        r = TileAir;
+      }
+    }
+  }
+  if (tile.half()) {
+    if (l != c) {
+      l = TileAir;
+    }
+    if (r != c) {
+      r = TileAir;
+    }
+    t = TileAir;
   }
 
   int blend = 0;
-
-  // fix color mismatches
-  if (!world->info[c]->grass) {
-    if (t == -2 && tile->color != world->tiles[offset - stride].color) {
+  // fix paint mismatches
+  if (!world.info[c]->grass) {
+    if (t == TileBlend && tile.paint != world.tiles[offset - stride].paint) {
       blend |= 8;
       t = c;
     }
-    if (b == -2 && tile->color != world->tiles[offset + stride].color) {
+    if (b == TileBlend && tile.paint != world.tiles[offset + stride].paint) {
       blend |= 4;
       b = c;
     }
-    if (l == -2 && tile->color != world->tiles[offset - 1].color) {
+    if (l == TileBlend && tile.paint != world.tiles[offset - 1].paint) {
       blend |= 2;
       l = c;
     }
-    if (r == -2 && tile->color != world->tiles[offset + 1].color) {
+    if (r == TileBlend && tile.paint != world.tiles[offset + 1].paint) {
       blend |= 1;
       r = c;
     }
   }
 
   int mask = 0;
-  mask |= (t == c) ? 0xc0 : (t == -2) ? 0x80 : 0;
-  mask |= (b == c) ? 0x30 : (b == -2) ? 0x20 : 0;
-  mask |= (l == c) ? 0x0c : (l == -2) ? 0x08 : 0;
-  mask |= (r == c) ? 0x03 : (r == -2) ? 0x02 : 0;
-  mask |= (tl == c) ? 0xc000 : (tl == -2) ? 0x8000 : 0;
-  mask |= (tr == c) ? 0x3000 : (tr == -2) ? 0x2000 : 0;
-  mask |= (bl == c) ? 0x0c00 : (bl == -2) ? 0x0800 : 0;
-  mask |= (br == c) ? 0x0300 : (br == -2) ? 0x0200 : 0;
+  mask |= (t == c) ? 0xc0 : (t == TileBlend) ? 0x80 : 0;
+  mask |= (b == c) ? 0x30 : (b == TileBlend) ? 0x20 : 0;
+  mask |= (l == c) ? 0x0c : (l == TileBlend) ? 0x08 : 0;
+  mask |= (r == c) ? 0x03 : (r == TileBlend) ? 0x02 : 0;
+  mask |= (tl == c) ? 0xc000 : (tl == TileBlend) ? 0x8000 : 0;
+  mask |= (tr == c) ? 0x3000 : (tr == TileBlend) ? 0x2000 : 0;
+  mask |= (bl == c) ? 0x0c00 : (bl == TileBlend) ? 0x0800 : 0;
+  mask |= (br == c) ? 0x0300 : (br == TileBlend) ? 0x0200 : 0;
 
-  QRandomGenerator *rp = QRandomGenerator::system();
-  int set = (rp->generate() % 3) * 2;
-  if (world->info[c]->large)
+  int set = (rand() % 3) * 2;
+  if (world.info[c]->large) {
     set = (phlebasTiles[y % 4][x % 3] - 1) * 2;
+  }
 
-  if (world->info[c]->grass) {
-    for (auto const &rule : grassRules) {
+  if (world.info[c]->grass) {
+    for (const auto &rule : grassRules) {
       if ((mask & rule.mask) == rule.val) {
-        world->tiles[offset].u = rule.uvs[set];
-        world->tiles[offset].v = rule.uvs[set + 1];
+        world.tiles[offset].u = rule.uvs[set];
+        world.tiles[offset].v = rule.uvs[set + 1];
         return rule.blend | blend;
       }
     }
   }
 
-  if (world->info[c]->merge || world->info[c]->dirt) {
-    for (auto const &rule : blendRules) {
+  if (world.info[c]->merge || world.info[c]->dirt) {
+    for (const auto &rule : blendRules) {
       if ((mask & rule.mask) == rule.val) {
-        world->tiles[offset].u = rule.uvs[set];
-        world->tiles[offset].v = rule.uvs[set + 1];
-        if (world->info[c]->large && set == 6)
-          world->tiles[offset].v += 90;
+        world.tiles[offset].u = rule.uvs[set];
+        world.tiles[offset].v = rule.uvs[set + 1];
+        if (world.info[c]->large && set == 6) {
+          world.tiles[offset].v += 90;
+        }
         return rule.blend | blend;
       }
     }
-    if (!world->info[c]->grass) {
-      for (auto const &rule : noGrassRules) {
+    if (!world.info[c]->grass) {
+      for (const auto &rule : noGrassRules) {
         if ((mask & rule.mask) == rule.val) {
-          world->tiles[offset].u = rule.uvs[set];
-          world->tiles[offset].v = rule.uvs[set + 1];
-          if (world->info[c]->large && set == 6)
-            world->tiles[offset].v += 90;
+          world.tiles[offset].u = rule.uvs[set];
+          world.tiles[offset].v = rule.uvs[set + 1];
+          if (world.info[c]->large && set == 6) {
+            world.tiles[offset].v += 90;
+          }
           return rule.blend | blend;
         }
       }
     }
   }
   // no match, blends become merges
-  if (world->info[c]->grass)
+  if (world.info[c]->grass) {
     mask |= (mask & 0xaaaa) >> 1;
+  }
 
-  for (auto const &rule : uvRules) {
+  for (const auto &rule : uvRules) {
     if ((mask & rule.mask) == rule.val) {
-      world->tiles[offset].u = rule.uvs[set];
-      world->tiles[offset].v = rule.uvs[set + 1];
-      if (world->info[c]->large && set == 6)
-        world->tiles[offset].v += 90;
+      world.tiles[offset].u = rule.uvs[set];
+      world.tiles[offset].v = rule.uvs[set + 1];
+      if (world.info[c]->large && set == 6) {
+        world.tiles[offset].v += 90;
+      }
       return rule.blend | blend;
     }
   }
-  // should never get here.. since there's a catch-all rule in uvRules
+  // shouldn't get here since there's a catch-all rule in uvRules
   return blend;
 }
 
-void UVRules::fixCactus(const QSharedPointer<World> &world, int x, int y) {
-  int stride = world->tilesWide;
-  int offset =  y * stride + x;
+void UVRules::mapCactus(const World &world, int x, int y) {
+  int stride = world.tilesWide;
+  int offset = y * stride + x;
+
   // find base of cactus
   int basex = x;
   int base = offset;
-  while (world->tiles[base].active() && world->tiles[base].type == 80) {
+  while (world.tiles[base].active() && world.tiles[base].type == TileCactus) {
     base += stride;
-    if (!world->tiles[base].active() || world->tiles[base].type != 80) {
-      if (world->tiles[base - 1].active() &&
-          world->tiles[base - 1].type == 80 &&
-          world->tiles[base - stride - 1].active() &&
-          world->tiles[base - stride - 1].type == 80 && basex >= x) {
+    if (!world.tiles[base].active() || world.tiles[base].type != TileCactus) {
+      if (basex >= x && world.tiles[base - 1].active() && world.tiles[base - 1].type == TileCactus &&
+          world.tiles[base - stride - 1].active() && world.tiles[base - stride - 1].type == TileCactus) {
         basex--;
         base--;
       }
-      if (world->tiles[base + 1].active() &&
-          world->tiles[base + 1].type == 80 &&
-          world->tiles[base - stride + 1].active() &&
-          world->tiles[base - stride + 1].type == 80 && basex <= x) {
+      if (basex <= x && world.tiles[base + 1].active() && world.tiles[base + 1].type == TileCactus &&
+          world.tiles[base - stride + 1].active() && world.tiles[base - stride + 1].type == TileCactus) {
         basex++;
-        base--;
+        base++;
       }
     }
   }
 
   int mask = 0;
-  if (x < world->tilesWide - 1) {
-    auto right = &world->tiles[offset + 1];
-    if (right->active() && right->type == 80)
+  if (x < world.tilesWide - 1) {
+    const auto &right = world.tiles[offset + 1];
+    if (right.active() && right.type == TileCactus) {
       mask |= 0x01;
+    }
   }
   if (x > 0) {
-    auto left = &world->tiles[offset - 1];
-    if (left->active() && left->type == 80)
+    const auto &left = world.tiles[offset - 1];
+    if (left.active() && left.type == TileCactus) {
       mask |= 0x02;
+    }
     if (x > 1) {
-      auto fl = &world->tiles[offset - 2];
-      if (fl->active() && fl->type == 80)
+      const auto &fl = world.tiles[offset - 2];
+      if (fl.active() && fl.type == TileCactus) {
         mask |= 0x40;
+      }
     }
   }
-  if (y < world->tilesHigh - 1) {
-    auto bottom = &world->tiles[offset + stride];
-    if (bottom->active() && bottom->type == 80)
+  if (y < world.tilesHigh - 1) {
+    const auto &bottom = world.tiles[offset + stride];
+    if (bottom.active() && bottom.type == TileCactus) {
       mask |= 0x04;
-    if (bottom->active() && world->info[bottom->type]->solid)
+    }
+    if (bottom.active() && world.info[bottom.type]->solid) {
       mask |= 0x80;
-    if (x < world->tilesWide - 1) {
-      auto br = &world->tiles[offset + stride + 1];
-      if (br->active() && br->type == 80)
+    }
+    if (x < world.tilesWide - 1) {
+      const auto &br = world.tiles[offset + stride + 1];
+      if (br.active() && br.type == TileCactus) {
         mask |= 0x10;
+      }
     }
     if (x > 0) {
-      auto bl = &world->tiles[offset + stride - 1];
-      if (bl->active() && bl->type == 80)
+      const auto &bl = world.tiles[offset + stride - 1];
+      if (bl.active() && bl.type == TileCactus) {
         mask |= 0x20;
+      }
     }
   }
   if (y > 0) {
-    auto top = &world->tiles[offset - stride];
-    if (top->active() && (top->type == 80 || top->type == 227))
+    const auto &top = world.tiles[offset - stride];
+    if (top.active() && (top.type == TileCactus || top.type == TileFlower)) {
       mask |= 0x08;
+    }
   }
-  if (x > basex) mask |= 0x200;
-  if (x < basex) mask |= 0x100;
+  if (x > basex) {
+    mask |= 0x200;
+  }
+  if (x < basex) {
+    mask |= 0x100;
+  }
 
-  for (auto const &rule : cactusRules) {
+  for (const auto &rule : cactusRules) {
     if ((mask & rule.mask) == rule.val) {
-      world->tiles[offset].u = rule.uvs[0];
-      world->tiles[offset].v = rule.uvs[1];
+      world.tiles[offset].u = rule.uvs[0];
+      world.tiles[offset].v = rule.uvs[1];
       return;
     }
   }
 }
 
+void UVRules::mapWall(const class World &world, int x, int y) {
+  int stride = world.tilesWide;
+  int offset = y * stride + x;
+  int mask = 0;
+  if (y > 0) {
+    const auto &top = world.tiles[offset - stride];
+    if (top.wall || (top.active() && top.type == TileGlass)) {
+      mask |= 1;
+    }
+  }
+  if (x > 0) {
+    const auto &left = world.tiles[offset - 1];
+    if (left.wall || (left.active() && left.type == TileGlass)) {
+      mask |= 2;
+    }
+  }
+  if (x < world.tilesWide - 1) {
+    const auto &right = world.tiles[offset + 1];
+    if (right.wall || (right.active() && right.type == TileGlass)) {
+      mask |= 4;
+    }
+  }
+  if (y < world.tilesHigh - 1) {
+    const auto &bottom = world.tiles[offset + stride];
+    if (bottom.wall || (bottom.active() && bottom.type == TileGlass)) {
+      mask |= 8;
+    }
+  }
 
+  int set = (rand() % 3) * 2;
+  int wall = world.tiles[offset].wall;
+  switch (world.info.walls.at(wall)->large) {
+    case 1:
+      set = (phlebasTiles[y % 4][x % 3] - 1) * 2;
+      break;
+    case 2:
+      set = (phlebasTiles[x % 2][y % 2] - 1) * 2;
+      break;
+  }
 
+  if (mask == 15) {
+    mask += wallRandom[x % 3][y % 3];
+  }
 
-
-
-
-
-
-
-
-
-
-
-
-
+  world.tiles[offset].wallu = walluvs[mask][set];
+  world.tiles[offset].wallv = walluvs[mask][set + 1];
+}

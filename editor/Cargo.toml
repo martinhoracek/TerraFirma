@@ -1,0 +1,13 @@
+[package]
+name = "editor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+const_format = "0.2.34"
+eframe = "0.32.2"
+egui = "0.32.2"
+egui-file-dialog = "0.11.0"
+egui_extras = "0.32.3"
+serde = {version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.143"

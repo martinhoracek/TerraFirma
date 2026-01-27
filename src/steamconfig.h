@@ -1,29 +1,37 @@
-/** @Copyright 2015 seancode */
+/** @copyright 2025 Sean Kasun */
 
 #pragma once
-
-#include <QHash>
-#include <QString>
-#include <QList>
-#include <QFile>
+#include <unordered_map>
+#include <string>
+#include <filesystem>
+#include <memory>
 
 class SteamConfig {
-  class Element {
-   public:
-    QHash<QString, Element> children;
-    QString name, value;
-    Element();
-    explicit Element(QList<QString> *lines);
-    QString find(const QString &path);
-  };
+  public:
+    SteamConfig();
+    std::filesystem::path getBase() const;
+    std::filesystem::path getTerraria() const;
+    std::filesystem::path expand(const char *path) const;
 
- public:
-  SteamConfig();
-  QString operator[](const QString &path) const;
-  QString getBase() const;
+  private:
+    struct Tokenizer {
+      std::string data;
+      size_t pos;
+      char next();
+      std::string key();
+    };
+    
+    struct Element {
+      Element();
+      explicit Element(Tokenizer *t);
+      std::string find(const std::string &path) const;
+    
+      std::unordered_map<std::string, struct Element> children;
+      std::string name, value;
+    };
 
- private:
-  void parse(const QString &filename);
-  QString steamBase;
-  Element *root;
+    std::unique_ptr<Element> parsevdf(const std::filesystem::path &base);
+
+    std::filesystem::path steamBase;
+    std::filesystem::path terrariaBase;
 };

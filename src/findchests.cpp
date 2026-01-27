@@ -1,80 +1,83 @@
-/**
- * @Copyright 2015 seancode
- *
- * @Handles item list dialog
- */
+/** @copyright 2025 Sean Kasun */
 
-#include "./findchests.h"
-#include "./ui_findchests.h"
+#include "findchests.h"
+#include <imgui.h>
+#include <misc/cpp/imgui_stdlib.h>
+#include <algorithm>
 
-
-class FindChests::ItemsFilterProxyModel : public QSortFilterProxyModel {
-public:
-  explicit ItemsFilterProxyModel(QObject* parent = nullptr) : QSortFilterProxyModel(parent) {}
-
-  bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override {
-    if (sourceParent.isValid()) {
-      return true;
+static bool contains(const std::string &haystack, const std::string &needle) {
+  auto it = std::search(
+    haystack.begin(), haystack.end(),
+    needle.begin(), needle.end(),
+    [](unsigned char ch1, unsigned char ch2) {
+      return std::tolower(ch1) == std::tolower(ch2);
     }
-    return QSortFilterProxyModel::filterAcceptsRow(sourceRow, sourceParent);
-  }
-};
+  );
+  return it != haystack.end();
+}
 
-
-FindChests::FindChests(const QList<World::Chest> &chests, L10n *l10n, QWidget *parent): QDialog(parent), ui(new Ui::FindChests) {
-  ui->setupUi(this);
-
-  QHash<QString, QList<int>> roots;
-
-  for (int i = 0; i < chests.length(); i++) {
-    for (auto const &item : chests[i].items) {
-      if (!roots[l10n->xlateItem(item.name)].contains(i)) {
-        roots[l10n->xlateItem(item.name)].append(i);
+FindChests::FindChests(const World &world, const L10n &l10n) {
+  std::unordered_map<std::string, Item> items;
+  search[0] = 0;
+  selected = glm::vec2(0, 0);
+  int i = 1;
+  for (const auto &chest : world.chests) {
+    Chest c;
+    c.name = chest.name.empty() ? "Chest #" + std::to_string(i) : chest.name;
+    c.location = glm::vec2(chest.x, chest.y);
+    for (const auto &item : chest.items) {
+      std::string name = l10n.xlateItem(item.name);
+      // if an item is in the chest twice, without being stacked, it'll appear twice
+      if (!items[name].seen.contains(std::pair(c.location.x, c.location.y))) {
+        items[name].chests.push_back(c); 
+        items[name].seen.emplace(std::pair(c.location.x, c.location.y));
       }
     }
+    i++;
   }
+  for (auto &item : items) {
+    item.second.name = item.first;
+    std::sort(item.second.chests.begin(), item.second.chests.end(), [](const Chest &a, const Chest &b) {
+      return a.name < b.name;
+    });
+    this->items.push_back(item.second);
+  }
+  std::sort(this->items.begin(), this->items.end(), [](const Item &a, const Item &b) {
+    return a.name < b.name;
+  });
+}
 
-  QHashIterator<QString, QList<int>> i(roots);
-  auto root = model.invisibleRootItem();
-  while (i.hasNext()) {
-    i.next();
-    auto item = new QStandardItem(i.key());
-    item->setEditable(false);
-    for (int num : i.value()) {
-      auto child = new QStandardItem(chests[num].name.isEmpty() ? tr("Chest #%1").arg(num) : chests[num].name);
-      child->setEditable(false);
-      child->setData(QPointF(chests[num].x, chests[num].y), Qt::UserRole);
-      item->appendRow(child);
+glm::vec2 FindChests::pickChest() {
+  ImGui::InputText("Search", &search);
+  ImGui::BeginChild("##chests", ImVec2(400, 400));
+  for (const auto &item : items) {
+    if (!search.empty() && !contains(item.name, search)) {
+      continue;
     }
-    root->appendRow(item);
-  }
-
-  model.sort(0, Qt::AscendingOrder);
-
-  filter = new ItemsFilterProxyModel(this);
-  filter->setSourceModel(&model);
-  ui->treeView->setModel(filter);
-
-  connect(ui->treeView->selectionModel(), &QItemSelectionModel::currentChanged,
-          this, &FindChests::chestSelected);
-}
-
-FindChests::~FindChests() {
-  delete ui;
-}
-
-void FindChests::chestSelected(QModelIndex const& current, QModelIndex const& previous) {
-  (void)previous;
-
-  if (current.isValid()) {
-    auto data = current.data(Qt::UserRole);
-    if (!data.isNull()) {
-      emit jump(data.toPointF());
+    if (ImGui::TreeNodeEx(item.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+      for (const auto &chest : item.chests) {
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Leaf;
+        if (chest.location == selected) {
+          flags |= ImGuiTreeNodeFlags_Selected;
+        }
+        if (ImGui::TreeNodeEx(chest.name.c_str(), flags)) {
+          if (ImGui::IsItemClicked()) {
+            selected = chest.location;
+          }
+          ImGui::TreePop();
+        }
+      }
+      ImGui::TreePop();
     }
   }
-}
-
-void FindChests::searchTextChanged(const QString &newText) {
-  filter->setFilterRegularExpression(newText);
-  filter->setFilterCaseSensitivity(Qt::CaseInsensitive);
+  ImGui::EndChild();
+  if (ImGui::Button("Cancel")) {
+    ImGui::CloseCurrentPopup();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Okay")) {
+    ImGui::CloseCurrentPopup();
+    return selected;
+  }
+  return glm::vec2(0, 0);
 }

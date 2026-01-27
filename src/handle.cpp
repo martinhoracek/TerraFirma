@@ -1,66 +1,70 @@
-/**
- * @Copyright 2015 seancode
- *
- * Binary reader class, reads files or qbytearrays
- */
+/** @copyright 2025 Sean Kasun */
 
-#include "./handle.h"
-#include <QFile>
+#include "handle.h"
+#include <filesystem>
+#include <fstream>
 
-Handle::Handle(const QString &filename) {
-  QFile f(filename);
-  if (f.exists() && f.open(QIODevice::ReadOnly)) {
-    pos = 0;
-    len = f.size();
-    bytearray = f.read(len);
-    data = (const quint8 *)bytearray.constData();
-  } else {
-    data = nullptr;
+Handle::Handle(const std::string &filename) {
+  data = pos = nullptr;
+  std::ifstream f(filename, std::ios::in | std::ios::binary);
+  if (!f.is_open()) {
+    return;
+  }
+  length = std::filesystem::file_size(filename);
+  data = new uint8_t[length];
+  f.read(reinterpret_cast<char*>(data), length);
+  f.close();
+  pos = data;
+  alloc = true;
+}
+
+Handle::Handle(uint8_t *data, uint32_t len) : data(data), length(len) {
+  pos = data;
+  alloc = false;
+}
+
+Handle::~Handle() {
+  if (alloc) {
+    delete [] data;
   }
 }
-Handle::Handle(const QByteArray &array) {
-  bytearray = array;
-  data = (const quint8 *)bytearray.constData();
-  pos = 0;
-  len = bytearray.length();
-}
 
-bool Handle::exists() const {
+bool Handle::isOpen() const {
   return data != nullptr;
 }
 
-bool Handle::eof() const {
-  return pos >= len;
+int64_t Handle::tell() const {
+  return pos - data;
 }
 
-quint8 Handle::r8() {
-  return data[pos++];
+uint8_t Handle::r8() {
+  return *pos++;
 }
 
-quint16 Handle::r16() {
-  quint16 r = data[pos++];
-  r |= data[pos++] << 8;
+uint16_t Handle::r16() {
+  uint16_t r = *pos++;
+  r |= *pos++ << 8;
   return r;
 }
 
-quint32 Handle::r32() {
-  quint32 r = data[pos++];
-  r |= data[pos++] << 8;
-  r |= data[pos++] << 16;
-  r |= data[pos++] << 24;
+uint32_t Handle::r32() {
+  uint32_t r = *pos++;
+  r |= *pos++ << 8;
+  r |= *pos++ << 16;
+  r |= *pos++ << 24;
   return r;
 }
 
-quint64 Handle::r64() {
-  quint64 r = r32();
-  r |= (quint64)r32() << 32;
+uint64_t Handle::r64() {
+  uint64_t r = r32();
+  r |= static_cast<uint64_t>(r32()) << 32;
   return r;
 }
 
 float Handle::rf() {
   union {
     float f;
-    quint32 l;
+    uint32_t l;
   } fl;
   fl.l = r32();
   return fl.f;
@@ -69,61 +73,49 @@ float Handle::rf() {
 double Handle::rd() {
   union {
     double d;
-    quint64 l;
+    uint64_t l;
   } dl;
   dl.l = r64();
   return dl.d;
 }
 
-QString Handle::rs() {
+std::string Handle::read(int len) {
+  std::string s(reinterpret_cast<char const *>(pos), len);
+  pos += len;
+  return s;
+}
+
+std::string Handle::rcs() {
+  std::string r;
+  char ch;
+  while ((ch = *pos++) != 0) {
+    r += ch;
+  }
+  return r;
+}
+
+std::string Handle::rs() {
   uint len = 0;
   int shift = 0;
-  quint8 u7;
+  uint8_t u7;
   do {
-    u7 = data[pos++];
+    u7 = *pos++;
     len |= (u7 & 0x7f) << shift;
     shift += 7;
   } while (u7 & 0x80);
   return read(len);
 }
 
-QString Handle::rcs() {
-  QString r;
-  quint8 ch = 0;
-  do {
-    ch = data[pos++];
-    if (ch) {
-      r += QChar(ch);
-    }
-  } while (ch);
-  return r;
+uint8_t *Handle::readBytes(int length) {
+  uint8_t *oldpos = pos;
+  pos += length;
+  return oldpos;
 }
 
-
-QString Handle::read(int len) {
-  int oldPos = pos;
-  pos += len;
-  return QString::fromUtf8((const char *)data + oldPos, len);
+void Handle::skip(int64_t length) {
+  pos += length;
 }
 
-const char *Handle::readBytes(int len) {
-  int oldPos = pos;
-  pos += len;
-  return (const char *)data + oldPos;
-}
-
-void Handle::skip(int len) {
-  pos += len;
-}
-
-void Handle::seek(int offset) {
-  pos = offset;
-}
-
-qint64 Handle::tell() const {
-  return pos;
-}
-
-qint64 Handle::length() const {
-  return len;
+void Handle::seek(int64_t p) {
+  pos = data + p;
 }

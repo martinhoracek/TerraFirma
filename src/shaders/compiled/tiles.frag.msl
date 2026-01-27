@@ -1,0 +1,291 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct buf
+{
+    uint hiliting;
+};
+
+struct main0_out
+{
+    float4 fragColor [[color(0)]];
+};
+
+struct main0_in
+{
+    float2 uv [[user(locn0)]];
+    int paint [[user(locn1)]];
+};
+
+fragment main0_out main0(main0_in in [[stage_in]], constant buf& ub [[buffer(0)]], texture2d<float> tex [[texture(0)]], sampler texSmplr [[sampler(0)]])
+{
+    main0_out out = {};
+    float4 c = tex.sample(texSmplr, in.uv);
+    int paintgroup = in.paint;
+    if ((paintgroup > 27) && (paintgroup < 40))
+    {
+        bool _46 = (c.z * 0.5) < c.y;
+        bool _55;
+        if (_46)
+        {
+            _55 = (c.y * 0.5) < c.z;
+        }
+        else
+        {
+            _55 = _46;
+        }
+        bool _66;
+        if (_55)
+        {
+            _66 = (c.x * 0.300000011920928955078125) < c.z;
+        }
+        else
+        {
+            _66 = _55;
+        }
+        bool _76;
+        if (_66)
+        {
+            _76 = (c.x * 0.800000011920928955078125) > c.z;
+        }
+        else
+        {
+            _76 = _66;
+        }
+        bool _85;
+        if (_76)
+        {
+            _85 = (c.x * 0.800000011920928955078125) > c.y;
+        }
+        else
+        {
+            _85 = _76;
+        }
+        bool _94;
+        if (_85)
+        {
+            _94 = (c.x * 0.300000011920928955078125) < c.y;
+        }
+        else
+        {
+            _94 = _85;
+        }
+        if (_94)
+        {
+            paintgroup = 0;
+        }
+        else
+        {
+            paintgroup -= 27;
+        }
+    }
+    if (paintgroup > 0)
+    {
+        float hi = fast::max(c.x, fast::max(c.y, c.z));
+        float lo = fast::min(c.x, fast::min(c.y, c.z));
+        float origLo = lo;
+        if (paintgroup > 12)
+        {
+            if (paintgroup < 25)
+            {
+                lo *= 0.4000000059604644775390625;
+            }
+            paintgroup -= 12;
+        }
+        float md = (hi + lo) / 2.0;
+        switch (paintgroup)
+        {
+            case 1:
+            {
+                float3 _170 = float3(hi, lo, lo);
+                c.x = _170.x;
+                c.y = _170.y;
+                c.z = _170.z;
+                break;
+            }
+            case 2:
+            {
+                float3 _181 = float3(hi, md, lo);
+                c.x = _181.x;
+                c.y = _181.y;
+                c.z = _181.z;
+                break;
+            }
+            case 3:
+            {
+                float3 _191 = float3(hi, hi, lo);
+                c.x = _191.x;
+                c.y = _191.y;
+                c.z = _191.z;
+                break;
+            }
+            case 4:
+            {
+                float3 _202 = float3(md, hi, lo);
+                c.x = _202.x;
+                c.y = _202.y;
+                c.z = _202.z;
+                break;
+            }
+            case 5:
+            {
+                float3 _213 = float3(lo, hi, lo);
+                c.x = _213.x;
+                c.y = _213.y;
+                c.z = _213.z;
+                break;
+            }
+            case 6:
+            {
+                float3 _224 = float3(lo, hi, md);
+                c.x = _224.x;
+                c.y = _224.y;
+                c.z = _224.z;
+                break;
+            }
+            case 7:
+            {
+                float3 _234 = float3(lo, hi, hi);
+                c.x = _234.x;
+                c.y = _234.y;
+                c.z = _234.z;
+                break;
+            }
+            case 8:
+            {
+                float3 _245 = float3(lo, md, hi);
+                c.x = _245.x;
+                c.y = _245.y;
+                c.z = _245.z;
+                break;
+            }
+            case 9:
+            {
+                float3 _255 = float3(lo, lo, hi);
+                c.x = _255.x;
+                c.y = _255.y;
+                c.z = _255.z;
+                break;
+            }
+            case 10:
+            {
+                float3 _266 = float3(md, lo, hi);
+                c.x = _266.x;
+                c.y = _266.y;
+                c.z = _266.z;
+                break;
+            }
+            case 11:
+            {
+                float3 _277 = float3(hi, lo, hi);
+                c.x = _277.x;
+                c.y = _277.y;
+                c.z = _277.z;
+                break;
+            }
+            case 12:
+            {
+                float3 _288 = float3(hi, lo, md);
+                c.x = _288.x;
+                c.y = _288.y;
+                c.z = _288.z;
+                break;
+            }
+            case 13:
+            {
+                float black = (hi + lo) * 0.1500000059604644775390625;
+                float3 _303 = float3(black);
+                c.x = _303.x;
+                c.y = _303.y;
+                c.z = _303.z;
+                break;
+            }
+            case 14:
+            {
+                float intensity = ((hi * 0.699999988079071044921875) + (lo * 0.300000011920928955078125)) * (2.0 - ((hi + lo) / 2.0));
+                float3 _325 = float3(intensity);
+                c.x = _325.x;
+                c.y = _325.y;
+                c.z = _325.z;
+                break;
+            }
+            case 15:
+            {
+                float3 _334 = float3(md);
+                c.x = _334.x;
+                c.y = _334.y;
+                c.z = _334.z;
+                break;
+            }
+            case 28:
+            {
+                float3 _348 = float3(hi, hi * 0.699999988079071044921875, hi * 0.4900000095367431640625);
+                c.x = _348.x;
+                c.y = _348.y;
+                c.z = _348.z;
+                break;
+            }
+            case 29:
+            {
+                float dark = (hi + lo) * 0.02500000037252902984619140625;
+                float3 _363 = float3(dark);
+                c.x = _363.x;
+                c.y = _363.y;
+                c.z = _363.z;
+                break;
+            }
+            case 30:
+            {
+                if (hi > 0.0)
+                {
+                    float _378 = c.x;
+                    float _381 = c.y;
+                    float _384 = c.z;
+                    float3 _386 = float3(1.0 - _378, 1.0 - _381, 1.0 - _384);
+                    c.x = _386.x;
+                    c.y = _386.y;
+                    c.z = _386.z;
+                }
+                break;
+            }
+            case 31:
+            {
+                if (hi > 0.0)
+                {
+                    c.x = fast::max(0.75 - (c.x * 2.0), 0.0);
+                    c.y = fast::max(0.75 - (c.y * 2.0), 0.0);
+                    c.z = fast::max(0.75 - (c.z * 2.0), 0.0);
+                }
+                else
+                {
+                    c.x *= 2.0;
+                    c.y *= 2.0;
+                    c.z *= 2.0;
+                }
+                break;
+            }
+        }
+    }
+    if (c.w < 0.100000001490116119384765625)
+    {
+        discard_fragment();
+    }
+    if (ub.hiliting != 0u)
+    {
+        float4 _450 = c;
+        float3 _452 = _450.xyz * float3(0.300000011920928955078125);
+        c.x = _452.x;
+        c.y = _452.y;
+        c.z = _452.z;
+    }
+    float4 _459 = c;
+    float3 _463 = powr(_459.xyz, float3(2.2000000476837158203125));
+    c.x = _463.x;
+    c.y = _463.y;
+    c.z = _463.z;
+    out.fragColor = c;
+    return out;
+}
+

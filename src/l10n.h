@@ -1,27 +1,30 @@
-/** @copyright 2020 seancode */
+/** @copyright 2025 Sean Kasun */
 
 #pragma once
 
-#include <QString>
-#include <QMap>
-#include <QList>
-#include <QSet>
-#include <QJsonObject>
+/*
+This is terrafirma's localization class.
+It parses the language files from terraria.exe to translate item names
+*/
+
+#include "json.h"
+#include <string>
+#include <set>
 
 class L10n {
-public:
-  L10n();
-  void load(QString exe);
-  QString xlateItem(const QString &key);
-  QString xlatePrefix(const QString &key);
-  QString xlateNPC(const QString &key);
-  QList<QString> getLanguages();
-  void setLanguage(QString lang);
+  public:
+    void load(std::string exe);
+    std::string xlateItem(const std::string &key) const;
+    std::string xlatePrefix(const std::string &key) const;
+    std::string xlateNPC(const std::string &key) const;
+    std::vector<std::string> getLanguages() const;
+    void setLanguage(std::string lang);
+    std::string selectedLanguage() const;
 
-private:
-  QMap<QString, QJsonObject> items;
-  QMap<QString, QJsonObject> prefixes;
-  QMap<QString, QJsonObject> npcs;
-  QSet<QString> languages;
-  QString currentLanguage = "en-US";
+  private:
+    std::unordered_map<std::string, std::shared_ptr<JSONData>> items;
+    std::unordered_map<std::string, std::shared_ptr<JSONData>> prefixes;
+    std::unordered_map<std::string, std::shared_ptr<JSONData>> npcs;
+    std::set<std::string> languages;
+    std::string currentLanguage = "en-US";
 };

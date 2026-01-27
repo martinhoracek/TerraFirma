@@ -1,29 +1,18 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(terrafirma VERSION 3.1.13 LANGUAGES C CXX)
+project(terrafirma VERSION 4.0 LANGUAGES CXX C)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 17)
+set(BUILD_SHARED_LIBS OFF)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets OpenGL OpenGLWidgets)
-if(NOT WIN32)
-find_package(ZLIB 1.1.2 REQUIRED)
-endif()
-qt_standard_project_setup()
+add_subdirectory(vendor)
 
+# debug
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
-if(WIN32)
-    set(app_icon "${CMAKE_CURRENT_SOURCE_DIR}/winicon.rc")
-    add_subdirectory(zlib)
-elseif(APPLE)
-    set(MACOSX_BUNDLE_ICON_FILE icon.icns)
-    set(app_icon "${CMAKE_CURRENT_SOURCE_DIR}/icon.icns")
-endif()
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/build")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory(src)
-
-if(UNIX AND NOT APPLE)
-install(FILES terrafirma.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications/)
-install(FILES res/terrafirma.png DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pixmaps/)
-install(TARGETS terrafirma RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin/)
-endif()

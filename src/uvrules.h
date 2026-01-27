@@ -1,13 +1,12 @@
-/** @Copyright 2015 seancode */
+/** @copyright 2025 Sean Kasun */
 
 #pragma once
 
-#include <QString>
-#include <QSharedPointer>
+#include <cstdint>
 
 class UVRules {
- public:
-  static void fixWall(const QSharedPointer<class World> &world, int x, int y);
-  static quint8 fixTile(const QSharedPointer<class World> &world, int x, int y);
-  static void fixCactus(const QSharedPointer<class World> &world, int x, int y);
+  public:
+    static uint8_t mapTile(const class World &world, int x, int y);
+    static void mapWall(const class World &world, int x, int y);
+    static void mapCactus(const class World &world, int x, int y);
 };

@@ -1,0 +1,79 @@
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#pragma clang diagnostic ignored "-Wmissing-braces"
+
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+template<typename T, size_t Num>
+struct spvUnsafeArray
+{
+    T elements[Num ? Num : 1];
+    
+    thread T& operator [] (size_t pos) thread
+    {
+        return elements[pos];
+    }
+    constexpr const thread T& operator [] (size_t pos) const thread
+    {
+        return elements[pos];
+    }
+    
+    device T& operator [] (size_t pos) device
+    {
+        return elements[pos];
+    }
+    constexpr const device T& operator [] (size_t pos) const device
+    {
+        return elements[pos];
+    }
+    
+    constexpr const constant T& operator [] (size_t pos) const constant
+    {
+        return elements[pos];
+    }
+    
+    threadgroup T& operator [] (size_t pos) threadgroup
+    {
+        return elements[pos];
+    }
+    constexpr const threadgroup T& operator [] (size_t pos) const threadgroup
+    {
+        return elements[pos];
+    }
+};
+
+struct buf
+{
+    float4x4 matrix;
+    float2 texsize;
+    float layer;
+};
+
+constant spvUnsafeArray<float2, 4> _19 = spvUnsafeArray<float2, 4>({ float2(0.0), float2(0.0, 1.0), float2(1.0, 0.0), float2(1.0) });
+
+struct main0_out
+{
+    float2 fraguv [[user(locn0)]];
+    float4 gl_Position [[position]];
+};
+
+struct main0_in
+{
+    float2 translate [[attribute(0)]];
+    float2 size [[attribute(1)]];
+    float2 uv [[attribute(2)]];
+    float2 uvsize [[attribute(3)]];
+};
+
+vertex main0_out main0(main0_in in [[stage_in]], constant buf& ub [[buffer(0)]], uint gl_VertexIndex [[vertex_id]])
+{
+    main0_out out = {};
+    float4x4 t = float4x4(float4(1.0, 0.0, 0.0, 0.0), float4(0.0, 1.0, 0.0, 0.0), float4(0.0, 0.0, 1.0, 0.0), float4(in.translate.x, in.translate.y, ub.layer, 1.0));
+    float2 dims = float2((in.size.x - 0.5) / ub.texsize.x, (in.size.y - 0.5) / ub.texsize.y);
+    out.gl_Position = (ub.matrix * t) * float4(_19[int(gl_VertexIndex)] * in.size, 0.0, 1.0);
+    out.fraguv = in.uv + (_19[int(gl_VertexIndex)] * in.uvsize);
+    return out;
+}
+

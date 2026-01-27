@@ -1,75 +1,72 @@
-/** @Copyright 2015 seancode */
+/** @copyright 2025 Sean Kasun */
 
 #pragma once
 
-#include <QString>
-#include <QHash>
-#include <QList>
-#include <QJsonObject>
-#include <QSharedPointer>
-#include "./handle.h"
+const int MinVersion = 88;
+const int MaxVersion = 315;
+
+#include "handle.h"
+#include "json.h"
+#include <vector>
+#include <unordered_map>
+#include <memory>
 
 class WorldHeader {
- public:
-  class Header {
-   public:
-    Header();
-    virtual ~Header();
-    int toInt() const;
-    double toDouble() const;
-    int length() const;
-    QSharedPointer<Header> at(int i) const;
-    void setData(quint64 v);
-    void setData(QString s);
-    void append(quint64 v);
-    void append(QString s);
-   private:
-    quint64 dint;
-    double ddbl;
-    QString dstr;
-    QList<QSharedPointer<Header>> arr;
-  };
-
-  WorldHeader();
-  virtual ~WorldHeader();
-  void init();
-  void load(const QSharedPointer<Handle> &handle, int version);
-  bool has(QString const &key) const;
-  QSharedPointer<Header> operator[](QString const &key) const;
-  bool is(QString const &key) const;
-  int treeStyle(int x) const;
-
-  class InitException {
-   public:
-    explicit InitException(QString const reason) : reason(reason) {}
-    QString reason;
-  };
-
- private:
-  QHash<QString, QSharedPointer<Header>> data;
-
-  struct Field {
-    enum Type {
-      BOOLEAN,
-      BYTE,
-      INT16,
-      INT32,
-      INT64,
-      FLOAT32,
-      FLOAT64,
-      STRING,
-      ARRAY_BYTE,
-      ARRAY_INT32,
-      ARRAY_STRING
+  public:
+    class Header {
+      public:
+        Header();
+        virtual ~Header();
+        int toInt() const;
+        double toDouble() const;
+        int length() const;
+        std::shared_ptr<Header> at(int i) const;
+        void setData(uint64_t v);
+        void setData(std::string s);
+        void append(uint64_t v);
+        void append(std::string s);
+      private:
+        uint64_t dint;
+        double ddbl;
+        std::string dstr;
+        std::vector<std::shared_ptr<Header>> darr;
     };
 
-    explicit Field(QJsonObject const &data);
+    WorldHeader();
+    virtual ~WorldHeader();
+    void load(std::shared_ptr<Handle> handle, int version);
+    bool has(const std::string &key) const;
+    std::shared_ptr<Header> operator[](const std::string &key) const;
+    bool is(const std::string &key) const;
+    int treeStyle(int x) const;
 
-    QString name;
-    Type type;
-    int length, minVersion, maxVersion;
-    QString dynamicLength;
-  };
+  private:
+    std::unordered_map<std::string, std::shared_ptr<Header>> data;
 
-  QList<Field> fields;
+    struct Field {
+      enum Type {
+        BOOLEAN,
+        BYTE,
+        INT16,
+        INT32,
+        INT64,
+        FLOAT32,
+        FLOAT64,
+        STRING,
+        ARRAY_BYTE,
+        ARRAY_INT32,
+        ARRAY_STRING,
+      };
+
+      explicit Field(std::shared_ptr<JSONData> data);
+
+      std::string name;
+      Type type;
+      int length, minVersion, maxVersion;
+      std::string dynamicLength;
+    };
+
+    int getFieldLength(const Field &f);
+
+    std::vector<Field> fields;
 };

@@ -40,3 +40,4 @@ cscope.out
 # Qt/Qmake
 .qmake.stash
 .DS_Store
+.cache

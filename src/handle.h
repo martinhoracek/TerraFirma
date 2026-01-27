@@ -1,35 +1,36 @@
-/** @Copyright 2015 seancode */
+/** @copyright 2025 Sean Kasun */
 
 #pragma once
 
-#include <QByteArray>
+#include <string>
+#include <cstdint>
 
 class Handle {
- public:
-  explicit Handle(const QString &fileName);
-  explicit Handle(const QByteArray &array);
+  public:
+    explicit Handle(const std::string &filename);
+    Handle(uint8_t *data, uint32_t len);
+    ~Handle();
 
-  bool exists() const;
-  bool eof() const;
-  quint8 r8();
-  quint16 r16();
-  quint32 r32();
-  quint64 r64();
-  float rf();
-  double rd();
-  QString rs();
-  QString rcs();
-  QString read(int len);
-  const char *readBytes(int len);
-  void skip(int len);
-  void seek(int offset);
-  qint64 length() const;
-  qint64 tell() const;
+    bool isOpen() const;
+    bool eof() const;
+    int64_t tell() const;
+    
+    uint8_t r8();
+    uint16_t r16();
+    uint32_t r32();
+    uint64_t r64();
+    float rf();
+    double rd();
+    std::string read(int length);
+    std::string rcs();
+    std::string rs();
+    uint8_t *readBytes(int length);
+    void seek(int64_t pos);
+    void skip(int64_t length);
 
- protected:
-  const quint8 *data;
+    int64_t length;
 
- private:
-  QByteArray bytearray;
-  qint64 pos, len;
+  private:
+    uint8_t *data, *pos;
+    bool alloc = false;
 };
