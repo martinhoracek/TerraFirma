@@ -128,12 +128,12 @@ impl Walls {
                     });
                     row.col(|ui| {
                         ui.add(
-                            egui::DragValue::new(&mut self.entries[row_index].id).range(0..=500), // boundaries for wall ids
+                            egui::DragValue::new(&mut self.entries[row_index].blend).range(0..=500), // boundaries for wall ids
                         );
                     });
                     row.col(|ui| {
                         ui.add(
-                            egui::DragValue::new(&mut self.entries[row_index].id).range(0..=2), // boundaries for large
+                            egui::DragValue::new(&mut self.entries[row_index].large).range(0..=2), // boundaries for large
                         );
                     });
                     row.col(|ui| {
