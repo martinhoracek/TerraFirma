@@ -40,13 +40,17 @@ impl Items {
 
     pub fn view(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         let mut scroll_to = None;
+        let add_shortcut = egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::A);
         ui.horizontal(|ui| {
             if ui
                 .button(formatcp!("{} Add new item", icons::ADD))
                 .clicked()
+                || ctx.input_mut(|i| i.consume_shortcut(&add_shortcut))
             {
                 self.entries.push(Item::default());
-                scroll_to = Some(self.entries.len() - 1);
+                let lastindex = self.entries.len() - 1;
+                self.entries[lastindex].id = self.entries[lastindex - 1].id + 1;
+                scroll_to = Some(lastindex);
             }
         });
 
