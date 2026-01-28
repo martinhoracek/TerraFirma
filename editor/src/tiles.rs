@@ -7,6 +7,7 @@ use std::{
     error::Error,
     fs::File,
     io::{BufReader, BufWriter},
+    mem,
     path::PathBuf,
 };
 
@@ -152,6 +153,7 @@ impl Tiles {
             .column(Column::initial(50.0))
             .column(Column::initial(200.0))
             .column(Column::auto())
+            .column(Column::auto())
             .column(Column::auto());
         if let Some(to) = scroll_to {
             table = table.scroll_to_row(to, None);
@@ -165,6 +167,9 @@ impl Tiles {
                     ui.strong("Name");
                 });
                 header.col(|ui| {
+                    ui.strong("Reorder");
+                });
+                header.col(|ui| {
                     ui.strong("Edit");
                 });
                 header.col(|ui| {
@@ -172,6 +177,7 @@ impl Tiles {
                 });
             })
             .body(|body| {
+                let mut swap = None;
                 body.rows(18.0, self.entries.len(), |mut row| {
                     let row_index = row.index();
                     row.col(|ui| {
@@ -195,6 +201,11 @@ impl Tiles {
                         }
                     });
                     row.col(|ui| {
+                        if ui.small_button(icons::MOVEDOWN).clicked() {
+                            swap = Some(row_index);
+                        }
+                    });
+                    row.col(|ui| {
                         if ui.small_button(icons::EDIT).clicked() {
                             self.to_edit.push(row_index);
                         }
@@ -205,6 +216,10 @@ impl Tiles {
                         }
                     });
                 });
+                if let Some(p) = swap {
+                    let t = mem::replace(&mut self.entries[p], Tile::default());
+                    self.entries[p] = mem::replace(&mut self.entries[p + 1], t);
+                }
             });
         if self.to_edit.len() > 0 {
             let tilepos = *self.to_edit.first().unwrap();
