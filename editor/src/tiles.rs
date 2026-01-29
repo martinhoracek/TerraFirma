@@ -308,13 +308,22 @@ fn edit_tile(ctx: &egui::Context, tile: &mut Tile, edit: &Vec<usize>) -> TileAct
                                 let mut present = tile.color.is_some();
                                 ui.checkbox(&mut present, "");
                                 if present {
-                                    let mut c = if let Some(c) = tile.color.as_ref() {
-                                        color::string_to_color(c)
+                                    if let Some(c) = tile.color.as_ref() {
+                                        let mut color = c.to_owned();
+                                        let (rect, _) = ui.allocate_exact_size(
+                                            ui.spacing().interact_size,
+                                            Sense::hover(),
+                                        );
+                                        ui.painter_at(rect).rect_filled(
+                                            rect,
+                                            0,
+                                            color::string_to_color32(c),
+                                        );
+                                        ui.text_edit_singleline(&mut color);
+                                        tile.color = Some(color);
                                     } else {
-                                        [0.0, 0.0, 0.0]
-                                    };
-                                    ui.color_edit_button_rgb(&mut c);
-                                    tile.color = Some(color::color_to_string(c));
+                                        tile.color = Some("#000000".to_owned());
+                                    }
                                 } else {
                                     tile.color = None;
                                 }
@@ -646,13 +655,22 @@ fn edit_var(ctx: &egui::Context, mut var: &mut TileVariant, edit: &Vec<usize>) -
                             let mut present = var.color.is_some();
                             ui.checkbox(&mut present, "");
                             if present {
-                                let mut c = if let Some(c) = var.color.as_ref() {
-                                    color::string_to_color(c)
+                                if let Some(c) = var.color.as_ref() {
+                                    let mut color = c.to_owned();
+                                    let (rect, _) = ui.allocate_exact_size(
+                                        ui.spacing().interact_size,
+                                        Sense::hover(),
+                                    );
+                                    ui.painter_at(rect).rect_filled(
+                                        rect,
+                                        0,
+                                        color::string_to_color32(c),
+                                    );
+                                    ui.text_edit_singleline(&mut color);
+                                    var.color = Some(color);
                                 } else {
-                                    [0.0, 0.0, 0.0]
-                                };
-                                ui.color_edit_button_rgb(&mut c);
-                                var.color = Some(color::color_to_string(c));
+                                    var.color = Some("#000000".to_owned());
+                                }
                             } else {
                                 var.color = None;
                             }
