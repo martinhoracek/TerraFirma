@@ -4,8 +4,12 @@
 #include <cctype>
 #include <fstream>
 #include <filesystem>
+#if WIN32
+#include <shlobj.h>
+#else
 #include <unistd.h>
 #include <pwd.h>
+#endif
 #include <cctype>
 #include <algorithm>
 
@@ -17,7 +21,6 @@ static const char *libFolders[] = {
 };
 
 SteamConfig::SteamConfig() {
-  std::string home = getpwuid(getuid())->pw_dir;
   for (int i = 0; libFolders[i]; i++) {
     auto base = expand(libFolders[i]);
     auto vdf = parsevdf(base / "config" / "libraryfolders.vdf");
@@ -45,7 +48,8 @@ std::filesystem::path SteamConfig::expand(const char *path) const {
     if (SUCCEEDED(hr)) {
       std::filesystem::path home = docpath;
       CoTaskMemFree(docpath);
-      return home + (path + 1);
+      std::string tail = path + 2;  // skip over ~/
+      return home / tail;
     }
 #else
     std::string home = getpwuid(getuid())->pw_dir;

@@ -141,9 +141,10 @@ void Textures::resetFlat(SDL_GPUDevice *gpu) {
 }
 
 void Textures::load(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy, int slot, const std::string name) {
-  Handle handle(root / (name + ".xnb"));
+  auto path = root / (name + ".xnb");
+  Handle handle(path.string());
   if (!handle.isOpen()) {
-    SDL_Log("Failed to open texture: %s", (root / (name + ".xnb")).c_str());
+    SDL_Log("Failed to open texture: %s", path.string().c_str());
     return;  // ignore missing textures
   }
 

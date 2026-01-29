@@ -1,4 +1,7 @@
-add_executable(${PROJECT_NAME})
+add_executable(${PROJECT_NAME} MACOSX_BUNDLE
+  ${application_icon}
+  ${application_rc}
+)
 
 add_executable(embed embed.cpp)
 file(GLOB shaderbins shaders/compiled/*)

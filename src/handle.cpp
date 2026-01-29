@@ -95,7 +95,7 @@ std::string Handle::rcs() {
 }
 
 std::string Handle::rs() {
-  uint len = 0;
+  uint32_t len = 0;
   int shift = 0;
   uint8_t u7;
   do {

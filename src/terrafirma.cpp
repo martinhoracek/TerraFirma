@@ -39,7 +39,7 @@ void Terrafirma::init() {
   populateWorldMenu();
 
   l10n.setLanguage(settings.getLanguage());
-  l10n.load(settings.getExe());
+  l10n.load(settings.getExe().string());
   canShowTextures = map.setTextures(settings.getTextures());
   map.showTextures(showTextures && canShowTextures);
   map.showWires(showWires);
@@ -176,7 +176,7 @@ bool Terrafirma::renderGui() {
   int idx = 0;
   for (const auto &file : worlds) {
     if (idx < 9 && ImGui::Shortcut(ImGuiMod_Ctrl | (ImGuiKey_1 + idx++), ImGuiInputFlags_RouteGlobal)) {
-      openWorld(file);
+      openWorld(file.string());
     }
   }
   if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_RouteGlobal)) {
@@ -201,8 +201,8 @@ bool Terrafirma::renderGui() {
           if (idx < 9) {
             shortcut = std::string("Ctrl+") + "123456789"[idx++];
           }
-          if (ImGui::MenuItem(file.filename().c_str(), shortcut.c_str())) {
-            openWorld(file);
+          if (ImGui::MenuItem(file.filename().string().c_str(), shortcut.c_str())) {
+            openWorld(file.string());
           }
         }
         ImGui::EndMenu();
@@ -571,7 +571,7 @@ void Terrafirma::openDialog() {
 
 void Terrafirma::reloadSettings() {
   l10n.setLanguage(settings.getLanguage());
-  l10n.load(settings.getExe());
+  l10n.load(settings.getExe().string());
   canShowTextures = map.setTextures(settings.getTextures());
   populateWorldMenu();
 }

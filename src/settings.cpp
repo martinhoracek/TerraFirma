@@ -202,7 +202,7 @@ void Settings::load() {
   customTerrariaPath[0] = 0;
   language = "en-US";
 
-  Handle h(prefFile());
+  Handle h(prefFile().string());
   if (h.isOpen()) {
     try {
       auto data = JSON::parse(h.read(h.length));
