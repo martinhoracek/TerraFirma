@@ -59,6 +59,14 @@ void WorldHeader::load(std::shared_ptr<Handle> handle, int version) {
             }
           }
           break;
+        case Field::Type::ARRAY_INT16:
+          {
+            auto num = getFieldLength(field);
+            for (int i = 0; i < num; i++) {
+              header->append(handle->r16());
+            }
+          }
+          break;
         case Field::Type::ARRAY_INT32:
           {
             auto num = getFieldLength(field);
@@ -127,7 +135,7 @@ WorldHeader::Field::Field(std::shared_ptr<JSONData> data) {
   } else if (t == "u8") {
     type = (data->has("num") || data->has("relnum")) ? Type::ARRAY_BYTE : Type::BYTE;
   } else if (t == "i16") {
-    type = Type::INT16;
+    type = (data->has("num") || data->has("relnum")) ? Type::ARRAY_INT16 : Type::INT16;
   } else if (t == "i32") {
     type = (data->has("num") || data->has("relnum")) ? Type::ARRAY_INT32 : Type::INT32;
   } else if (t == "i64") {

@@ -54,6 +54,7 @@ class WorldHeader {
         FLOAT64,
         STRING,
         ARRAY_BYTE,
+        ARRAY_INT16,
         ARRAY_INT32,
         ARRAY_STRING,
       };
