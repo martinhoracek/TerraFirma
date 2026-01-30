@@ -1,5 +1,6 @@
 use crate::{color, dialogs::confirm, icons};
 use const_format::formatcp;
+use egui::Sense;
 use egui_extras::{Column, TableBuilder};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -65,6 +66,7 @@ impl Walls {
             .column(Column::initial(50.0))
             .column(Column::initial(200.0))
             .column(Column::initial(50.0))
+            .column(Column::initial(70.0))
             .column(Column::initial(50.0))
             .column(Column::initial(50.0))
             .column(Column::auto());
@@ -83,6 +85,9 @@ impl Walls {
                 });
                 header.col(|ui| {
                     ui.strong("Color");
+                });
+                header.col(|ui| {
+                    ui.strong("");
                 });
                 header.col(|ui| {
                     ui.strong("Blend");
@@ -122,9 +127,16 @@ impl Walls {
                         }
                     });
                     row.col(|ui| {
-                        let mut c = color::string_to_color(self.entries[row_index].color.as_str());
-                        ui.color_edit_button_rgb(&mut c);
-                        self.entries[row_index].color = color::color_to_string(c);
+                        let (rect, _) =
+                            ui.allocate_exact_size(ui.spacing().interact_size, Sense::hover());
+                        ui.painter_at(rect).rect_filled(
+                            rect,
+                            0,
+                            color::string_to_color32(self.entries[row_index].color.as_str()),
+                        );
+                    });
+                    row.col(|ui| {
+                        ui.text_edit_singleline(&mut self.entries[row_index].color);
                     });
                     row.col(|ui| {
                         ui.add(
