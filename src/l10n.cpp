@@ -260,7 +260,11 @@ std::vector<std::string> L10n::getLanguages() const {
 }
 
 std::string L10n::xlateItem(const std::string &key) const {
-  auto str = items.at(currentLanguage)->at(key)->asString();
+  auto json = items.find(currentLanguage);
+  if (json == items.end()) {
+    return key;
+  }
+  auto str = json->second->at(key)->asString();
   std::regex re("\\{\\$ItemName\\.(.+?)\\}");
   std::cmatch match;
   if (std::regex_search(str.c_str(), match, re)) {
@@ -273,11 +277,19 @@ std::string L10n::xlateItem(const std::string &key) const {
 }
 
 std::string L10n::xlatePrefix(const std::string &key) const {
-  return prefixes.at(currentLanguage)->at(key)->asString();
+  auto json = prefixes.find(currentLanguage);
+  if (json == prefixes.end()) {
+    return key;
+  }
+  return json->second->at(key)->asString();
 }
 
 std::string L10n::xlateNPC(const std::string &key) const {
-  auto str = npcs.at(currentLanguage)->at(key)->asString();
+  auto json = npcs.find(currentLanguage);
+  if (json == npcs.end()) {
+    return key;
+  }
+  auto str = json->second->at(key)->asString();
   std::regex re("\\{\\$NPCName\\.(.+?)\\}");
   std::cmatch match;
   if (std::regex_search(str.c_str(), match, re)) {
