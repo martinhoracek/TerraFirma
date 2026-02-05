@@ -36,5 +36,7 @@ if (APPLE)
     RESOURCE "${application_icon}"
   )
   install(TARGETS ${PROJECT_NAME} BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR})
+else()
+  install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 endif()
 

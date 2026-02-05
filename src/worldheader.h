@@ -3,7 +3,7 @@
 #pragma once
 
 const int MinVersion = 88;
-const int MaxVersion = 316;
+const int MaxVersion = 317;
 
 #include "handle.h"
 #include "json.h"
