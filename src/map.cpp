@@ -37,6 +37,7 @@ std::string Map::init(SDL_GPUDevice *gpu) {
 
 bool Map::load(std::string filename, SDL_Mutex *mutex) {
   if (!world.load(filename, mutex)) {
+    world.failed = true;
     return false;
   }
   jumpToSpawn();
@@ -153,6 +154,10 @@ void Map::showHouses(bool houses) {
 
 bool Map::loaded() {
   return world.loaded;
+}
+
+bool Map::failed() {
+  return world.failed;
 }
 
 void Map::copy(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy) {

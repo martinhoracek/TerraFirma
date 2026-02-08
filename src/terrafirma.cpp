@@ -289,7 +289,7 @@ bool Terrafirma::renderGui() {
     ImGui::Begin("Loading...", nullptr, ImGuiWindowFlags_NoScrollbar);
     ImGui::ProgressBar(ImGui::GetTime() * -0.2f, ImVec2(0, 0), map.progress().c_str());
     ImGui::End();
-    if (map.loaded()) {
+    if (map.loaded() || map.failed()) {
       loadOver = true;
     }
     SDL_UnlockMutex(loadMutex);
@@ -414,7 +414,7 @@ bool Terrafirma::renderGui() {
     ImGui::OpenPopup("About");
   }
   if (ImGui::BeginPopup("About")) {
-    ImGui::Text("Terrafirma v4.0.2");
+    ImGui::Text("Terrafirma v4.0.3");
     ImGui::Text("© Copright 2026 Sean Kasun");
     ImGui::EndPopup();
   }
@@ -523,6 +523,8 @@ void Terrafirma::openWorld(std::string file) {
   }
   loadMutex = SDL_CreateMutex();
   LoadWorld *info = new LoadWorld;
+  world.loaded = false;
+  world.failed = false;
   info->map = &map;
   info->file = file;
   info->mutex = loadMutex;

@@ -18,6 +18,7 @@ class Map {
     void setSize(int w, int h);
     bool load(std::string filename, SDL_Mutex *mutex);
     bool loaded();
+    bool failed();
     std::string progress();
     void copy(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy);
     void render(SDL_GPUCommandBuffer *cmd, SDL_GPURenderPass *renderPass);

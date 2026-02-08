@@ -9,10 +9,15 @@
 
 bool World::load(const std::string &filename, SDL_Mutex *mutex) {
   loaded = false;
+  failed = false;
   if (loadLock == nullptr) {
     loadLock = SDL_CreateMutex();
   }
   auto handle = std::make_shared<Handle>(filename);
+  if (!handle->isOpen()) {
+    setProgress("File not found", mutex);
+    return false;
+  }
 
   auto version = handle->r32();
   setProgress("Loading map version " + std::to_string(version), mutex);

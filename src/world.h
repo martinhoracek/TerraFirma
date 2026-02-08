@@ -18,6 +18,7 @@ class World {
     Tile *tiles;
     uint8_t *colors;
     bool loaded = false;
+    bool failed = false;
 
     struct Chest {
       struct Item {
