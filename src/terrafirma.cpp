@@ -414,7 +414,7 @@ bool Terrafirma::renderGui() {
     ImGui::OpenPopup("About");
   }
   if (ImGui::BeginPopup("About")) {
-    ImGui::Text("Terrafirma v4.0.3");
+    ImGui::Text("Terrafirma v4.0.4");
     ImGui::Text("© Copright 2026 Sean Kasun");
     ImGui::EndPopup();
   }
