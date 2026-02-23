@@ -79,5 +79,5 @@ glm::vec2 FindChests::pickChest() {
     ImGui::CloseCurrentPopup();
     return selected;
   }
-  return glm::vec2(0, 0);
+  return selected;
 }
